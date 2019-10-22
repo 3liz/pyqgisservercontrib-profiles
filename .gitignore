@@ -1,0 +1,35 @@
+*.pyc
+*.pyo
+*.egg-info
+dist
+build
+tmp
+.tox
+docs/_build
+
+build.manifest
+
+__pycache__
+
+# Test outputs
+.cache
+.pytest_cache
+__output__
+
+# vim, mac os
+*.sw*
+.DS_Store
+.*.un~
+
+# git
+
+*.orig
+.coverage
+
+# Test log
+docker-test.log
+
+.local
+.qgis-restart
+
+/tests/data/montpellier
