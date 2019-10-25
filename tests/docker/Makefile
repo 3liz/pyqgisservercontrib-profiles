@@ -24,8 +24,13 @@ SRCDIR=$(shell realpath ../..)
 
 SCRIPTS=./tests/docker
 
-test:
-	mkdir -p $$(pwd)/.local $(LOCAL_HOME)/.cache
+
+local:
+	rm -rf $$(pwd)/.local/share
+	mkdir -p  $$(pwd)/.local  $(LOCAL_HOME)/.cache
+
+
+test: local
 	echo -n "Restart qgis" > .qgis-restart
 	docker run --rm --name qgis-py-server-test-$(COMMITID) -w /src \
 		-u $(BECOME_USER) \
@@ -47,8 +52,7 @@ test:
 
 WORKERS:=1
 
-run:
-	mkdir -p $$(pwd)/.local $(LOCAL_HOME)/.cache
+run: local
 	echo -n "Restart qgis" > .qgis-restart
 	docker run -it --rm -p $(SERVER_HTTP_PORT):8080 --name qgis-py-server-run-$(COMMITID) -w /src \
 		-u $(BECOME_USER) \
@@ -71,4 +75,22 @@ run:
 		-e QGSRV_DATA_PATH=/.local/share/qgis-server \
 		--entrypoint $(SCRIPTS)/run_server.sh \
 		$(QGIS_IMAGE)
+
+
+QGIS_WPSIMAGE=$(REGISTRY_PREFIX)qgis-wps:$(FLAVOR)
+
+wpstest: local
+	docker run --rm --name qgis-wps-test-$(FLAVOR)-$(COMMITID) -w /src \
+		-u $(BECOME_USER) \
+		-v $(SRCDIR):/src \
+		-v $$(pwd)/.local:/.local \
+		-v $(LOCAL_HOME)/.cache:/.cache \
+		-e PIP_CACHE_DIR=/.cache \
+		-e QYWPS_SERVER_PROFILES=/src/tests/profiles.yml \
+		-e PYTEST_ADDOPTS="$(PYTEST_ADDOPTS)" \
+		-e QYWPS_CACHE_ROOTDIR=/src/tests/data \
+		-e QYWPS_SERVER_HTTP_PROXY=yes \
+		-e QGIS_OPTIONS_PATH=/src/tests/qgis \
+		--entrypoint $(SCRIPTS)/run-wps-tests.sh \
+		$(QGIS_WPSIMAGE)
 

@@ -242,8 +242,8 @@ def register_filters() -> None:
 def register_wpsfilters() -> None:
     """ Register filters for WPS
     """
-    from qywps.filters import blockingfilter
-    from qywps.config import get_config, get_env_config
+    from pyqgiswps.filters import blockingfilter
+    from pyqgiswps.config import get_config, get_env_config
 
     with_profiles = get_env_config('server','profiles','QYWPS_SERVER_PROFILES')
     if with_profiles:

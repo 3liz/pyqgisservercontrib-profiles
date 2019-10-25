@@ -41,7 +41,7 @@ setup(
         'pyqgisserver_filters': [
             'profiles = pyqgisservercontrib.profiles.filters:register_filters',
         ],
-        'pyqgisserver_wpsfilters': [
+        'pywpsserver_filters': [
             'profiles = pyqgisservercontrib.profiles.filters:register_wpsfilters',
         ]
     },
