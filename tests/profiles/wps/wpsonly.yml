@@ -15,3 +15,10 @@ wpsrejectips:
   allowed_ips:
     - 192.168.2.0/24
 
+wpsmap:
+  services: 
+    - WPS
+  parameters:
+    MAP: france_parts.qgs
+
+ 

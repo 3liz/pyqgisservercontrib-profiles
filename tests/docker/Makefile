@@ -89,6 +89,7 @@ wpstest: local
 		-e QYWPS_SERVER_PROFILES=/src/tests/profiles.yml \
 		-e PYTEST_ADDOPTS="$(PYTEST_ADDOPTS)" \
 		-e QYWPS_CACHE_ROOTDIR=/src/tests/data \
+		-e QYWPS_PROCESSING_PROVIDERS_MODULE_PATH=/src/tests/wpstests \
 		-e QYWPS_SERVER_HTTP_PROXY=yes \
 		-e QGIS_OPTIONS_PATH=/src/tests/qgis \
 		--entrypoint $(SCRIPTS)/run-wps-tests.sh \
