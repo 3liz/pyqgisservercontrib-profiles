@@ -20,5 +20,13 @@ wpsmap:
     - WPS
   parameters:
     MAP: france_parts.qgs
+  accesspolicy:
+    allow: all
 
- 
+withpolicy: 
+  services:
+    - WPS
+  accesspolicy:
+    allow: 
+      - "pyqgiswps_test:testsimplevalue"
+

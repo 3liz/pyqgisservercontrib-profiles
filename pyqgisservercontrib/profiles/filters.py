@@ -29,7 +29,7 @@ import yaml
 import traceback
 import functools
 
-from tornado.web import HTTPError
+from tornado.web import HTTPError, RequestHandler
 
 from yaml.nodes import SequenceNode
 
@@ -83,17 +83,22 @@ class Loader(yaml.SafeLoader):
 Loader.add_constructor('!include', Loader.include)
 
 
+def _kwargs( kwargs, *args ):
+    return { k:kwargs.get(k) for k in args }
+
+
 class ProfileError(Exception):
     """ Raised when profil does not match
     """
 
 class _Profile:
     
-    def __init__(self, data: Mapping[str,Any]) -> None:
+    def __init__(self, data: Mapping[str,Any], wpspolicy: bool=False) -> None:
         self._services    = data.get('services')
         self._parameters  = data.get('parameters',{})
         self._allowed_ips = [ip_network(ip) for ip in data.get('allowed_ips',[])]
         self._allowed_referers = data.get('allowed_referers')
+        self._accesspolicy = data.get('accesspolicy') if wpspolicy else None
 
     def test_services(self, request: HTTPRequest) -> None:
         """ Test allowed services
@@ -134,25 +139,28 @@ class _Profile:
             if not ip in ipn:
                 raise ProfileError("Rejected ip %s" % ip)
 
-    def apply(self, request: HTTPRequest, http_proxy: bool) -> None:
+    def apply(self, handler: RequestHandler, http_proxy: bool) -> None:
         """ Apply profiles constraints
         """
+        request = handler.request
         request.arguments.update((k,[v.encode()]) for k,v in  self._parameters.items())
         self.test_services(request)
         self.test_allowed_referers(request)
         self.test_allowed_ips(request, http_proxy)
-               
+        if self._accesspolicy:
+            handler.accesspolicy.add_policy(**_kwargs(self._accesspolicy,'deny','allow'))
+
 
 class ProfileMngr:
     
     @classmethod
-    def initialize( cls, profiles: str, exit_on_error: bool=True ) -> 'ProfileMngr':
+    def initialize( cls, profiles: str, exit_on_error: bool=True, wpspolicy: bool=False ) -> 'ProfileMngr':
         """ Create Profile manager
 
             param Profiles: path to profile configuration
         """
         try:
-            mngr = ProfileMngr()
+            mngr = ProfileMngr(wpspolicy=wpspolicy)
             mngr.load(profiles)
             return mngr
         except Exception:
@@ -163,21 +171,24 @@ class ProfileMngr:
             else:
                 raise
 
-    def __init__(self) -> None:
+    def __init__(self, wpspolicy: bool=False) -> None:
         self._autoreload = None
+        self._wpspolicy  = wpspolicy
 
     def load( self, profiles: str) -> None:
         """ Load profile configuration
         """
+        wps = self._wpspolicy
         LOGGER.info("Reading profiles %s",profiles)
         with open(profiles,'r') as f:
             config = yaml.load(f, Loader=Loader)
         self._profiles = {}
+        self._accesspolicy = config.get('accesspolicy') if wps else None
+
         allow_default = config.get('allow_default_profile', True)
         if allow_default:
-            self._profiles['default'] = _Profile(config.get('default',{}))
-
-        self._profiles.update( (k,_Profile(v)) for k,v in config.get('profiles',{}).items() )
+            self._profiles['default'] = _Profile(config.get('default',{}), wpspolicy=wps)
+        self._profiles.update( (k,_Profile(v,wpspolicy=wps)) for k,v in config.get('profiles',{}).items() )
 
         # Configure auto reload
         if config.get('autoreload', False):
@@ -193,7 +204,8 @@ class ProfileMngr:
             LOGGER.info("Disabling profiles autoreload")
             self._autoreload.stop()            
 
-    def apply_profile( self, name: str, request: HTTPRequest, http_proxy: bool=False) -> bool:
+    def apply_profile( self, name: str, handler: RequestHandler, 
+                       http_proxy: bool=False) -> bool:
         """ Check profile condition
         """
         try:
@@ -202,7 +214,11 @@ class ProfileMngr:
             profile = self._profiles.get(name or 'default')
             if profile is None:
                 raise ProfileError("Unknown profile")
-            profile.apply(request, http_proxy)
+            # Apply global access policy
+            if self._accesspolicy: 
+                handler.accesspolicy.add_policy(**_kwargs(self._accesspolicy,'deny','allow'))
+            # Apply filter
+            profile.apply(handler, http_proxy)
             return True
         except ProfileError as err:
             LOGGER.error("Invalid profile '%s': %s", name or "<default>", err)
@@ -219,19 +235,19 @@ def register_filters() -> None:
     with_profiles = get_env_config('server','profiles','QGSRV_SERVER_PROFILES')
     if with_profiles:
         mngr = ProfileMngr.initialize(with_profiles)
-       
+
         http_proxy = get_config('server').getboolean('http_proxy')
 
         @blockingfilter()
         def default_filter( handler ):
-            if not mngr.apply_profile('default', handler.request, http_proxy):
+            if not mngr.apply_profile('default', handler, http_proxy):
                 raise HTTPError(403,reason="Unauthorized profile")
 
         @blockingfilter(pri=-1000, uri=r"p/(?P<profile>.*)")
         def profile_filter( handler ):
             # Remove profile from argument list
             profile = handler.path_kwargs.pop('profile')
-            if not mngr.apply_profile(profile, handler.request, http_proxy):
+            if not mngr.apply_profile(profile, handler, http_proxy):
                 raise HTTPError(403,reason="Unauthorized profile")
 
         return [profile_filter, default_filter]
@@ -247,20 +263,20 @@ def register_wpsfilters() -> None:
 
     with_profiles = get_env_config('server','profiles','QYWPS_SERVER_PROFILES')
     if with_profiles:
-        mngr = ProfileMngr.initialize(with_profiles)
+        mngr = ProfileMngr.initialize(with_profiles, wpspolicy=True)
        
         http_proxy = get_config('server').getboolean('http_proxy',False)
 
         @blockingfilter()
-        def default_filter( handler ):
-            if not mngr.apply_profile('default', handler.request, http_proxy):
+        def default_filter( handler: RequestHandler ) -> None:
+            if not mngr.apply_profile('default', handler, http_proxy):
                 raise HTTPError(403,reason="Unauthorized profile")
 
         @blockingfilter(pri=-1000, uri=r"p/(?P<profile>.*)")
-        def profile_filter( handler ):
+        def profile_filter( handler: RequestHandler ) -> None:
             # Remove profile from argument list
             profile = handler.path_kwargs.pop('profile')
-            if not mngr.apply_profile(profile, handler.request, http_proxy):
+            if not mngr.apply_profile(profile, handler, http_proxy):
                 raise HTTPError(403,reason="Unauthorized profile")
 
         return [profile_filter, default_filter]

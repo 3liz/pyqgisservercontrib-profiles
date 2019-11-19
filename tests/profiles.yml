@@ -7,5 +7,9 @@ autoreload: yes
 # Allow anything
 default: {}
 
+# Global processes accesspolicy
+accesspolicy:
+    deny: all
+
 profiles: !include [ profiles/*/*.yml , profiles/*/*/*.yml ]
 

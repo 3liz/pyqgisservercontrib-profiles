@@ -26,7 +26,7 @@ SCRIPTS=./tests/docker
 
 
 local:
-	rm -rf $$(pwd)/.local/share
+	rm -rf $$(pwd)/.local
 	mkdir -p  $$(pwd)/.local  $(LOCAL_HOME)/.cache
 
 
@@ -94,4 +94,23 @@ wpstest: local
 		-e QGIS_OPTIONS_PATH=/src/tests/qgis \
 		--entrypoint $(SCRIPTS)/run-wps-tests.sh \
 		$(QGIS_WPSIMAGE)
+
+wpsrun: local
+	docker run --rm --name qgis-wps-test-$(FLAVOR)-$(COMMITID) -w /src \
+		-u $(BECOME_USER) \
+		-v $(SRCDIR):/src \
+		-v $$(pwd)/.local:/.local \
+		-v $(LOCAL_HOME)/.cache:/.cache \
+		-e PIP_CACHE_DIR=/.cache \
+		-e WORKERS=$(WORKERS) \
+		-e QYWPS_SERVER_PROFILES=/src/tests/profiles.yml \
+		-e PYTEST_ADDOPTS="$(PYTEST_ADDOPTS)" \
+		-e QYWPS_CACHE_ROOTDIR=/src/tests/data \
+		-e QYWPS_PROCESSING_PROVIDERS_MODULE_PATH=/src/tests/wpstests \
+		-e QYWPS_SERVER_HTTP_PROXY=yes \
+		-e QGIS_OPTIONS_PATH=/src/tests/qgis \
+		-e QYWPS_LOGLEVEL=DEBUG \
+		--entrypoint $(SCRIPTS)/run-wps-server.sh \
+		$(QGIS_WPSIMAGE)
+
 

@@ -48,3 +48,21 @@ class Tests(HTTPTestCase):
         rv = client.get(uri, path='')
         assert rv.status_code == 200
 
+    def test_access_policy(self):
+        """ Test access policy
+        """
+        uri = ('/ows/p/withpolicy/?service=WPS&request=GetCapabilities')
+        client = self.client_for(Service(executor=ProcessingExecutor()))
+        rv = client.get(uri, path='')
+        assert rv.status_code == 200
+
+        exposed = rv.xpath_text('/wps:Capabilities'
+                                  '/wps:ProcessOfferings'
+                                  '/wps:Process'
+                                  '/ows:Identifier')
+        # Check that there is only one exposed pyqgiswps_test
+        idents = [x for x in exposed.split() if x.startswith('pyqgiswps_test:')]
+        assert idents == ['pyqgiswps_test:testsimplevalue']
+
+
+
