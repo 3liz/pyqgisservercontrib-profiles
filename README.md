@@ -5,7 +5,7 @@ Middleware filter for providings profiles handling in [py-qgis-server](https://g
 ## Description
 
 The `profiles` extension add new uri locations
-associated to profiles that defines access control to the ressources.
+associated to profiles that define access control to the ressources.
 
 ### Profiles configuration
 
@@ -90,7 +90,7 @@ When the  server is accessed from behind a reverse proxy this must be declared w
 Note: Only for use with [py-qgis-wps](https://github.com/3liz/py-qgis-wps). It has not effects on py-qgis-server. 
 
 Define access policy for processes in WPS services. There is two directives: 'deny' and 'allow'. 
-Each entry define a  list of ar defined as comma separated list of Qgis algorithms identifiers. 
+Each entry define a comma separated list of Qgis algorithms identifiers. 
 Globbing style wildcards are allowed.
 
 Order of evaluation is allow/deny, if one directive match, the other is not evaluated. If none match
@@ -118,8 +118,8 @@ autoreload: yes
 # if no profiles is used
 default: {}
 
-# Global processes accesspolicyd
-# The global access policy is added to the per profile policy
+# Global wps access policy
+# The global access policy is added to each profile policy
 accesspolicy:
     deny: all
 
