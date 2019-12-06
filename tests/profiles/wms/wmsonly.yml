@@ -7,3 +7,11 @@ wmsonly:
   parameters:
     MAP: france_parts.qgs
 
+mappolicy:
+  services:
+    - WMS
+  only:
+    map: "france_*"
+
+
+

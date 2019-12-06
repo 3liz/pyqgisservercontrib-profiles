@@ -37,6 +37,7 @@ from typing import Mapping, TypeVar, Any
 
 from ipaddress import ip_address, ip_network
 from glob import glob 
+from pathlib import Path
 
 from .watchfiles import watchfiles
 
@@ -44,6 +45,20 @@ LOGGER = logging.getLogger('SRVLOG')
 
 # Define an abstract type for HTTPRequest
 HTTPRequest = TypeVar('HTTPRequest')
+
+class ProfileParseError(Exception):
+    pass
+
+
+def _to_list( arg ):
+    """ Convert an argument to list
+    """
+    if isinstance(arg,list):
+        return arg
+    elif isinstance(arg,str):
+        return arg.split(',')
+    else:
+        raise ProfileParseError("Expecting 'list' not %s" % type(s))
 
 
 class Loader(yaml.SafeLoader):
@@ -100,6 +115,9 @@ class _Profile:
         self._allowed_referers = data.get('allowed_referers')
         self._accesspolicy = data.get('accesspolicy') if wpspolicy else None
 
+        # 'only' directive
+        self._mapfilters  = _to_list(data.get('only',{}).get('map',[]))
+
     def test_services(self, request: HTTPRequest) -> None:
         """ Test allowed services
         """
@@ -139,6 +157,25 @@ class _Profile:
             if not ip in ipn:
                 raise ProfileError("Rejected ip %s" % ip)
 
+    def test_only( self, request: HTTPRequest ) -> None:
+        """ Test 'only' directive
+        """
+        maps = self._mapfilters
+        if not maps:
+            return
+
+        test = request.arguments.get('MAP')
+        if not test:
+            return
+
+        test = test[-1]
+        if isinstance(test,bytes):
+            test = test.decode()
+        test = Path(test)
+        if not any( test.match(m) for m in maps ):
+            raise ProfileError("Rejected MAP: %s" % test)
+
+
     def apply(self, handler: RequestHandler, http_proxy: bool) -> None:
         """ Apply profiles constraints
         """
@@ -147,6 +184,7 @@ class _Profile:
         self.test_services(request)
         self.test_allowed_referers(request)
         self.test_allowed_ips(request, http_proxy)
+        self.test_only(request)
         if self._accesspolicy:
             handler.accesspolicy.add_policy(**_kwargs(self._accesspolicy,'deny','allow'))
 
