@@ -9,6 +9,8 @@ docs/_build
 
 build.manifest
 
+*.log
+
 __pycache__
 
 # Test outputs

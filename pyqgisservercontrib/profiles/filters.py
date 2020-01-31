@@ -106,6 +106,21 @@ class ProfileError(Exception):
     """ Raised when profil does not match
     """
 
+def output_debug_profile(name, p):
+    LOGGER.debug(("===== Checking matching profile <%s>:\n"
+                  "* services: %s\n"
+                  "* parameters: %s\n"
+                  "* allowed ips: %s\n"
+                  "* allowed referers: %s\n"
+                  "* access policy: %s\n"
+                  ), name,
+                     p._services,
+                     p._parameters,
+                     p._allowed_ips,
+                     p._allowed_referers,
+                     p._accesspolicy
+                  )
+
 class _Profile:
     
     def __init__(self, data: Mapping[str,Any], wpspolicy: bool=False) -> None:
@@ -153,9 +168,8 @@ class _Profile:
             ip = request.remote_ip
         
         ip = ip_address(ip)
-        for ipn in self._allowed_ips:
-            if not ip in ipn:
-                raise ProfileError("Rejected ip %s" % ip)
+        if not any( (ip in _ips) for _ips in self._allowed_ips ):
+            raise ProfileError("Rejected ip %s" % ip)
 
     def test_only( self, request: HTTPRequest ) -> None:
         """ Test 'only' directive
@@ -256,6 +270,7 @@ class ProfileMngr:
             if self._accesspolicy: 
                 handler.accesspolicy.add_policy(**_kwargs(self._accesspolicy,'deny','allow'))
             # Apply filter
+            output_debug_profile(name,profile)
             profile.apply(handler, http_proxy)
             return True
         except ProfileError as err:

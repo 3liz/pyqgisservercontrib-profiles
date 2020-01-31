@@ -11,7 +11,7 @@ class Tests(HTTPTestCase):
         uri = ('/ows/p/wmsonly/?bbox=-621646.696284,5795001.359349,205707.697759,6354520.406319&crs=EPSG:3857'
                '&dpi=96&exceptions=application/vnd.ogc.se_inimage&format=image/png&height=915'
                '&layers=france_parts&request=GetMap'
-               '&service=WMS&styles=default&transparent=TRUE&version=1.3.0&width=1353')
+               '&service=WMS&transparent=TRUE&version=1.3.0&width=1353')
 
         rv = self.client.get(uri,path='')
         assert rv.status_code == 200
@@ -46,7 +46,7 @@ class Tests(HTTPTestCase):
         uri = ('/ows/p/wms/testpath?bbox=-621646.696284,5795001.359349,205707.697759,6354520.406319&crs=EPSG:3857'
                '&dpi=96&exceptions=application/vnd.ogc.se_inimage&format=image/png&height=915'
                '&layers=france_parts&request=GetMap'
-               '&service=WMS&styles=default&transparent=TRUE&version=1.3.0&width=1353')
+               '&service=WMS&transparent=TRUE&version=1.3.0&width=1353')
 
         rv = self.client.get(uri,path='')
         assert rv.status_code == 200
@@ -65,7 +65,7 @@ class Tests(HTTPTestCase):
         uri = ('/ows/p/mappolicy?bbox=-621646.696284,5795001.359349,205707.697759,6354520.406319&crs=EPSG:3857'
                '&dpi=96&exceptions=application/vnd.ogc.se_inimage&format=image/png&height=915'
                '&layers=france_parts&request=GetMap'
-               '&service=WMS&styles=default&transparent=TRUE&version=1.3.0&width=1353'
+               '&service=WMS&transparent=TRUE&version=1.3.0&width=1353'
                '&map=france_parts')
 
         rv = self.client.get(uri,path='')
