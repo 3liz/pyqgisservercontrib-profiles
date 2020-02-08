@@ -1,4 +1,4 @@
-from setuptools import setup, find_packages, Extension
+from setuptools import setup, find_namespace_packages, Extension
 import os
 
 def parse_requirements( filename ):
@@ -36,13 +36,10 @@ setup(
     description=VER.__description__,
     url='https://github.com/pyqgiservercontrib-profiles',
     python_requires=">=3.5",
-    packages=find_packages(include=['pyqgisservercontrib','pyqgisservercontrib.*']),
+    packages=find_namespace_packages(include=['pyqgisservercontrib.*']),
     entry_points={
-        'pyqgisserver_filters': [
-            'profiles = pyqgisservercontrib.profiles.filters:register_filters',
-        ],
-        'pywpsserver_filters': [
-            'profiles = pyqgisservercontrib.profiles.filters:register_wpsfilters',
+        'qgssrv_contrib_access_policy': [
+            'profile-policy = pyqgisservercontrib.profiles.filters:register_policy',
         ]
     },
     namespace_packages=['pyqgisservercontrib'],

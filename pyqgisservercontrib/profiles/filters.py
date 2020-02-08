@@ -39,12 +39,13 @@ from ipaddress import ip_address, ip_network
 from glob import glob 
 from pathlib import Path
 
-from .watchfiles import watchfiles
-
 LOGGER = logging.getLogger('SRVLOG')
 
 # Define an abstract type for HTTPRequest
 HTTPRequest = TypeVar('HTTPRequest')
+
+from pyqgisservercontrib.core.watchfiles import watchfiles
+from pyqgisservercontrib.core.filters import blockingfilter
 
 class ProfileParseError(Exception):
     pass
@@ -279,46 +280,16 @@ class ProfileMngr:
         return False
 
 
-def register_filters() -> None:
+def register_policy( collection, wpspolicy=False ) -> None:
+    """ Register filters
     """
-    """
-    from pyqgisserver.filters import blockingfilter
-    from pyqgisserver.config import get_config, get_env_config
+    from  pyqgisservercontrib.core import componentmanager
+    configservice  = componentmanager.get_service('@3liz.org/config-service;1')
 
-    with_profiles = get_env_config('server','profiles','QGSRV_SERVER_PROFILES')
+    with_profiles = configservice.get('server','profiles')
     if with_profiles:
-        mngr = ProfileMngr.initialize(with_profiles)
-
-        http_proxy = get_config('server').getboolean('http_proxy')
-
-        @blockingfilter()
-        def default_filter( handler ):
-            if not mngr.apply_profile('default', handler, http_proxy):
-                raise HTTPError(403,reason="Unauthorized profile")
-
-        @blockingfilter(pri=-1000, uri=r"p/(?P<profile>.*)")
-        def profile_filter( handler ):
-            # Remove profile from argument list
-            profile = handler.path_kwargs.pop('profile')
-            if not mngr.apply_profile(profile, handler, http_proxy):
-                raise HTTPError(403,reason="Unauthorized profile")
-
-        return [profile_filter, default_filter]
-    
-    return []
-
-
-def register_wpsfilters() -> None:
-    """ Register filters for WPS
-    """
-    from pyqgiswps.filters import blockingfilter
-    from pyqgiswps.config import get_config, get_env_config
-
-    with_profiles = get_env_config('server','profiles','QYWPS_SERVER_PROFILES')
-    if with_profiles:
-        mngr = ProfileMngr.initialize(with_profiles, wpspolicy=True)
-       
-        http_proxy = get_config('server').getboolean('http_proxy',False)
+        http_proxy = configservice.getboolean('server','http_proxy',False)
+        mngr = ProfileMngr.initialize(with_profiles, wpspolicy=wpspolicy)
 
         @blockingfilter()
         def default_filter( handler: RequestHandler ) -> None:
@@ -332,8 +303,5 @@ def register_wpsfilters() -> None:
             if not mngr.apply_profile(profile, handler, http_proxy):
                 raise HTTPError(403,reason="Unauthorized profile")
 
-        return [profile_filter, default_filter]
-    
-    return []
-
+        collection.extend([profile_filter, default_filter])
 
