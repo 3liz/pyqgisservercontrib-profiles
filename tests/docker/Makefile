@@ -86,11 +86,11 @@ wpstest: local
 		-v $$(pwd)/.local:/.local \
 		-v $(LOCAL_HOME)/.cache:/.cache \
 		-e PIP_CACHE_DIR=/.cache \
-		-e QYWPS_SERVER_PROFILES=/src/tests/profiles.yml \
+		-e QGSWPS_SERVER_PROFILES=/src/tests/profiles.yml \
 		-e PYTEST_ADDOPTS="$(PYTEST_ADDOPTS)" \
-		-e QYWPS_CACHE_ROOTDIR=/src/tests/data \
-		-e QYWPS_PROCESSING_PROVIDERS_MODULE_PATH=/src/tests/wpstests \
-		-e QYWPS_SERVER_HTTP_PROXY=yes \
+		-e QGSWPS_CACHE_ROOTDIR=/src/tests/data \
+		-e QGSWPS_PROCESSING_PROVIDERS_MODULE_PATH=/src/tests/wpstests \
+		-e QGSWPS_SERVER_HTTP_PROXY=yes \
 		-e QGIS_OPTIONS_PATH=/src/tests/qgis \
 		--entrypoint $(SCRIPTS)/run-wps-tests.sh \
 		$(QGIS_WPSIMAGE)
@@ -105,11 +105,11 @@ wpsrun: local
 		-e WORKERS=$(WORKERS) \
 		-e QYWPS_SERVER_PROFILES=/src/tests/profiles.yml \
 		-e PYTEST_ADDOPTS="$(PYTEST_ADDOPTS)" \
-		-e QYWPS_CACHE_ROOTDIR=/src/tests/data \
-		-e QYWPS_PROCESSING_PROVIDERS_MODULE_PATH=/src/tests/wpstests \
-		-e QYWPS_SERVER_HTTP_PROXY=yes \
+		-e QGSWPS_CACHE_ROOTDIR=/src/tests/data \
+		-e QGSWPS_PROCESSING_PROVIDERS_MODULE_PATH=/src/tests/wpstests \
+		-e QGSWPS_SERVER_HTTP_PROXY=yes \
 		-e QGIS_OPTIONS_PATH=/src/tests/qgis \
-		-e QYWPS_LOGLEVEL=DEBUG \
+		-e QGSWPS_LOGLEVEL=DEBUG \
 		--entrypoint $(SCRIPTS)/run-wps-server.sh \
 		$(QGIS_WPSIMAGE)
 
