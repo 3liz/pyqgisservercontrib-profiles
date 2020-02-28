@@ -286,7 +286,7 @@ def register_policy( collection, wpspolicy=False ) -> None:
     from  pyqgisservercontrib.core import componentmanager
     configservice  = componentmanager.get_service('@3liz.org/config-service;1')
 
-    with_profiles = configservice.get('server','profiles')
+    with_profiles = configservice.get('server','profiles', fallback=None)
     if with_profiles:
         http_proxy = configservice.getboolean('server','http_proxy',False)
         mngr = ProfileMngr.initialize(with_profiles, wpspolicy=wpspolicy)
