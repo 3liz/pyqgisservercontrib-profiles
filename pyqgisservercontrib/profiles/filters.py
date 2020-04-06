@@ -296,8 +296,18 @@ def prepare_config( config, prefix ):
     except:
         pass
 
-    config.set('server','profiles',os.getenv(prefix+'_SERVER_PROFILES'))
-    config.set('contrib:profiles','with_referer', os.getenv(prefix+'_CONTRIB_PROFILES_WITH_REFERER','no'))
+    default_ = object()
+
+    def init_( section, option, varname, fallback ):
+        value = config.get(section, option, fallback=default_)
+        if value is default_:
+            varvalue = os.getenv(varname)
+            if varvalue is not None:
+                config.set(section, option, varvalue)
+        return value
+
+    init_('server','profiles',prefix+'_SERVER_PROFILES', None)
+    init_('contrib:profiles','with_referer', prefix+'_CONTRIB_PROFILES_WITH_REFERER','no')
 
 
 def register_filters() -> None:
