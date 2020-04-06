@@ -303,7 +303,7 @@ def register_filters() -> None:
 
         http_proxy = config.getboolean('server','http_proxy')
 
-        with_referer = config.getboolean('contrib:profiles','profiles',
+        with_referer = config.getboolean('contrib:profiles','with_referer',
                                          fallback=os.getenv('QGSRV_CONTRIB_PROFILES_WITH_REFERER',False))
         if with_referer:
             LOGGER.info("Enabling referer on profile check")
@@ -340,7 +340,7 @@ def register_wpsfilters() -> None:
        
         http_proxy = get_config('server').getboolean('http_proxy',False)
 
-        with_referer = config.getboolean('contrib:profiles','profiles',
+        with_referer = config.getboolean('contrib:profiles','with_referer',
                                          fallback=os.getenv('QYWPS_CONTRIB_PROFILES_WITH_REFERER',False))
  
         if with_referer:
