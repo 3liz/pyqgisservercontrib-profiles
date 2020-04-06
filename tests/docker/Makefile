@@ -6,9 +6,8 @@ COMMITID=$(shell git rev-parse --short HEAD)
 
 FLAVOR:=ltr
 
-ifdef REGISTRY_URL
-	REGISTRY_PREFIX=$(REGISTRY_URL)/
-endif
+REGISTRY_URL ?= 3liz
+REGISTRY_PREFIX=$(REGISTRY_URL)/
 
 QGIS_IMAGE=$(REGISTRY_PREFIX)qgis-map-server:$(FLAVOR)
 
@@ -40,6 +39,7 @@ test: local
 		-e PIP_CACHE_DIR=/.cache \
 		-e QGSRV_TEST_PROTOCOL=/src/tests/data \
 		-e QGSRV_SERVER_PROFILES=/src/tests/profiles.yml \
+		-e QGSRV_CONTRIB_PROFILES_WITH_REFERER=yes \
 		-e QGSRV_SERVER_RESTARTMON=/src/.qgis-restart \
 		-e QGSRV_CACHE_ROOTDIR=/src/tests/data \
 		-e QGSRV_SERVER_HTTP_PROXY=yes \
@@ -66,6 +66,7 @@ run: local
 		-e QGSRV_CACHE_ROOTDIR=/src/tests/data \
 		-e QGSRV_TEST_PROTOCOL=/src/tests/data \
 		-e QGSRV_SERVER_PROFILES=/src/tests/profiles.yml \
+		-e QGSRV_CONTRIB_PROFILES_WITH_REFERER=yes \
 		-e QGSRV_SERVER_RESTARTMON=/src/.qgis-restart \
 		-e QGSRV_SERVER_HTTP_PROXY=yes \
 		-e QGSRV_LOGGING_LEVEL=DEBUG \

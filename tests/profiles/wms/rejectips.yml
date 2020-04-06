@@ -10,3 +10,10 @@ rejectips:
     - 192.168.2.0/24
     - 172.10.0.0/24
 
+referer:
+  allowed_referers:
+    - 'referer/ok'
+  parameters:
+    MAP: france_parts.qgs
+
+
