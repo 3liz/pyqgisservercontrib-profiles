@@ -38,7 +38,8 @@ test: local
 		-v $(LOCAL_HOME)/.cache:/.cache \
 		-e PIP_CACHE_DIR=/.cache \
 		-e QGSRV_TEST_PROTOCOL=/src/tests/data \
-		-e QGSRV_SERVER_PROFILES=/src/tests/profiles.yml \
+		-e QGSRV_CONTRIB_PROFILES_CONFIG=/src/tests/profiles.yml \
+		-e QGSRV_CONTRIB_PROFILES_WITH_REFERER=yes \
 		-e QGSRV_SERVER_RESTARTMON=/src/.qgis-restart \
 		-e QGSRV_CACHE_ROOTDIR=/src/tests/data \
 		-e QGSRV_SERVER_HTTP_PROXY=yes \

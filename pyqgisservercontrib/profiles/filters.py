@@ -12,6 +12,7 @@ profiles:
             MAP: ....
             ....
         # List of  allowed referers:
+        # Need (contrib:profiles -> referer_filter)
         allowed_referers:
             - ...
         # List of allowed ips range
@@ -20,7 +21,6 @@ profiles:
             - ...
 
     # Other profiles follows
-
 """
 import os
 import sys
@@ -147,11 +147,20 @@ class _Profile:
             if not service in self._services:
                 raise ProfileError("Rejected service %s" % service)
 
-    def test_allowed_referers(self, request: HTTPRequest) -> None:
-        """ Test allowed referers
+    def test_allowed_referers_or_ips(self, request: HTTPRequest, http_proxy: bool) -> None:
+        """ Test allowed referers or ips
         """
-        if self._allowed_referers and request.headers.get('Referer') not in self._allowed_referers:
-            raise ProfileError("Rejected referer %s" % request.headers.get('Referer') or 'None')
+        if self._allowed_referers:
+            referer = request.headers.get('Referer')
+            if referer in self._allowed_referers:
+                # Pass referer
+                return 
+            elif len(self._allowed_ips) == 0:
+                # No ips to check: return failure
+                raise ProfileError("Rejected referer: %s" % referer)
+
+        # Check ips
+        self.test_allowed_ips(request, http_proxy)
 
     def test_allowed_ips(self, request: HTTPRequest, http_proxy: bool) -> None:
         """ Test allowed ips
@@ -191,14 +200,16 @@ class _Profile:
             raise ProfileError("Rejected MAP: %s" % test)
 
 
-    def apply(self, handler: RequestHandler, http_proxy: bool) -> None:
+    def apply(self, handler: RequestHandler, http_proxy: bool, with_referer: bool=False) -> None:
         """ Apply profiles constraints
         """
         request = handler.request
         request.arguments.update((k,[v.encode()]) for k,v in  self._parameters.items())
         self.test_services(request)
-        self.test_allowed_referers(request)
-        self.test_allowed_ips(request, http_proxy)
+        if with_referer:
+            self.test_allowed_referers_or_ips(request, http_proxy)
+        else:
+            self.test_allowed_ips(request, http_proxy)
         self.test_only(request)
         if self._accesspolicy:
             handler.accesspolicy.add_policy(**_kwargs(self._accesspolicy,'deny','allow'))
@@ -258,7 +269,7 @@ class ProfileMngr:
             self._autoreload.stop()            
 
     def apply_profile( self, name: str, handler: RequestHandler, 
-                       http_proxy: bool=False) -> bool:
+                       http_proxy: bool=False, with_referer: bool=False) -> bool:
         """ Check profile condition
         """
         try:
@@ -272,7 +283,7 @@ class ProfileMngr:
                 handler.accesspolicy.add_policy(**_kwargs(self._accesspolicy,'deny','allow'))
             # Apply filter
             output_debug_profile(name,profile)
-            profile.apply(handler, http_proxy)
+            profile.apply(handler, http_proxy, with_referer=with_referer)
             return True
         except ProfileError as err:
             LOGGER.error("Invalid profile '%s': %s", name or "<default>", err)
@@ -285,22 +296,27 @@ def register_policy( collection, wpspolicy=False ) -> None:
     """
     from  pyqgisservercontrib.core import componentmanager
     configservice  = componentmanager.get_service('@3liz.org/config-service;1')
+    
+    configservice.add_section('contrib:profiles')
 
-    with_profiles = configservice.get('server','profiles', fallback=None)
+    with_profiles = configservice.get('server','profiles', fallback=None) or \
+                    configservice.get('contrib:profiles' , 'config', fallback=None)
     if with_profiles:
         http_proxy = configservice.getboolean('server','http_proxy',False)
         mngr = ProfileMngr.initialize(with_profiles, wpspolicy=wpspolicy)
 
+        with_referer = configservice.getboolean('contrib:profiles','with_referer',fallback=False)
+
         @blockingfilter()
         def default_filter( handler: RequestHandler ) -> None:
-            if not mngr.apply_profile('default', handler, http_proxy):
+            if not mngr.apply_profile('default', handler, http_proxy, with_referer=with_referer):
                 raise HTTPError(403,reason="Unauthorized profile")
 
         @blockingfilter(pri=-1000, uri=r"p/(?P<profile>.*)")
         def profile_filter( handler: RequestHandler ) -> None:
             # Remove profile from argument list
             profile = handler.path_kwargs.pop('profile')
-            if not mngr.apply_profile(profile, handler, http_proxy):
+            if not mngr.apply_profile(profile, handler, http_proxy, with_referer=with_referer):
                 raise HTTPError(403,reason="Unauthorized profile")
 
         collection.extend([profile_filter, default_filter])

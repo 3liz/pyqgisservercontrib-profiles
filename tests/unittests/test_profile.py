@@ -83,3 +83,24 @@ class Tests(HTTPTestCase):
         rv = self.client.get(uri,path='')
         assert rv.status_code == 403
 
+
+    def test_referer_return_403(self):
+        """ Test referer filter
+        """
+        uri = ('/ows/p/referer/?exceptions=application/vnd.ogc.se_inimage'
+               '&service=WFS&request=GetCapabilities')
+
+        rv = self.client.get(uri,path='', headers={ 'Referer': 'referer_not_ok' })
+        assert rv.status_code == 403
+
+
+    def test_referer_return_ok(self):
+        """ Test referer filter
+        """
+        uri = ('/ows/p/referer/?exceptions=application/vnd.ogc.se_inimage'
+               '&service=WFS&request=GetCapabilities')
+
+        rv = self.client.get(uri,path='', headers={ 'Referer': 'referer/ok' })
+        assert rv.status_code == 200
+
+
