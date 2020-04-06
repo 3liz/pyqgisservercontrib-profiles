@@ -289,6 +289,17 @@ class ProfileMngr:
         return False
 
 
+def prepare_config( config, prefix ):
+    
+    try:
+        config.add_section('contrib:profiles')
+    except:
+        pass
+
+    config.set('server','profiles',os.getenv(prefix+'_SERVER_PROFILES'))
+    config.set('contrib:profiles','with_referer', os.getenv(prefix+'_CONTRIB_PROFILES_WITH_REFERER','no'))
+
+
 def register_filters() -> None:
     """
     """
@@ -296,15 +307,15 @@ def register_filters() -> None:
     from pyqgisserver.config import get_config
 
     config = get_config()
+    prepare_config(config, 'QGSRV')
 
-    with_profiles = config.getboolean('server','profiles',fallback=os.getenv('QGSRV_SERVER_PROFILES',False))
+    with_profiles = config.get('server','profiles')
     if with_profiles:
         mngr = ProfileMngr.initialize(with_profiles)
 
-        http_proxy = config.getboolean('server','http_proxy')
+        http_proxy = config.getboolean('server','http_proxy',fallback=False)
 
-        with_referer = config.getboolean('contrib:profiles','with_referer',
-                                         fallback=os.getenv('QGSRV_CONTRIB_PROFILES_WITH_REFERER',False))
+        with_referer = config.getboolean('contrib:profiles','with_referer')
         if with_referer:
             LOGGER.info("Enabling referer on profile check")
 
@@ -332,17 +343,15 @@ def register_wpsfilters() -> None:
     from pyqgiswps.config import get_config
 
     config = get_config()
+    prepare_config(config, 'QYWPS')
 
-    with_profiles = config.getboolean('server','profiles',
-                                      fallback=os.getenv('QYWPS_SERVER_PROFILES',False))
+    with_profiles = config.get('server','profiles')
     if with_profiles:
         mngr = ProfileMngr.initialize(with_profiles, wpspolicy=True)
        
-        http_proxy = get_config('server').getboolean('http_proxy',False)
+        http_proxy = config.getboolean('server','http_proxy',fallback=False)
 
-        with_referer = config.getboolean('contrib:profiles','with_referer',
-                                         fallback=os.getenv('QYWPS_CONTRIB_PROFILES_WITH_REFERER',False))
- 
+        with_referer = config.getboolean('contrib:profiles','with_referer')
         if with_referer:
             LOGGER.info("Enabling referer on profile check")
 
