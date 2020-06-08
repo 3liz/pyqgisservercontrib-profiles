@@ -104,3 +104,13 @@ class Tests(HTTPTestCase):
         assert rv.status_code == 200
 
 
+    def test_referer_wildcard_ok(self):
+        """ Test referer filter
+        """
+        uri = ('/ows/p/referer/?exceptions=application/vnd.ogc.se_inimage'
+               '&service=WFS&request=GetCapabilities')
+
+        rv = self.client.get(uri,path='', headers={ 'Referer': 'http://referer.com/foobar' })
+        assert rv.status_code == 200
+
+

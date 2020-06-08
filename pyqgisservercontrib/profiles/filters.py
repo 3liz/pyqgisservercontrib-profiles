@@ -39,6 +39,7 @@ from ipaddress import ip_address, ip_network
 from glob import glob 
 from pathlib import Path
 
+
 LOGGER = logging.getLogger('SRVLOG')
 
 # Define an abstract type for HTTPRequest
@@ -152,9 +153,8 @@ class _Profile:
         """
         if self._allowed_referers:
             referer = request.headers.get('Referer')
-            if referer in self._allowed_referers:
-                # Pass referer
-                return 
+            if referer and any( Path(referer).match(m) for m in self._allowed_referers ):
+                return
             elif len(self._allowed_ips) == 0:
                 # No ips to check: return failure
                 raise ProfileError("Rejected referer: %s" % referer)

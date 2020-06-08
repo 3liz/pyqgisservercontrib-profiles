@@ -13,6 +13,7 @@ rejectips:
 referer:
   allowed_referers:
     - 'referer/ok'
+    - 'http://referer.com/*'
   parameters:
     MAP: france_parts.qgs
 
