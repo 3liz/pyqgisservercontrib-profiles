@@ -28,6 +28,7 @@ import logging
 import yaml
 import traceback
 import functools
+import jsonschema
 
 from tornado.web import HTTPError, RequestHandler
 
@@ -47,6 +48,69 @@ HTTPRequest = TypeVar('HTTPRequest')
 
 from pyqgisservercontrib.core.watchfiles import watchfiles
 from pyqgisservercontrib.core.filters import blockingfilter
+
+#
+# Schema for profiles
+#
+SERVICE_SCHEMA = dict(
+    type='array',
+    items={ 'type':'string' },
+    uniqueItems=True
+)
+
+PARAMETERS_SCHEMA = dict(
+    type='object',
+    properties={ 'additionalProperties': { 'type': 'string' }}
+)
+
+REFERER_SCHEMA = dict(
+    type='array',
+    items={ 'type':'string' }
+)
+
+IPS_SCHEMA = dict(
+    type='array',
+    items={ 'type':'string' }
+)
+
+POLICY_SCHEMA = dict(
+    type='object',
+    properties={
+        'deny': { 'oneOf': [
+            { 'type':'string'},
+            { 'type':'array', 'items':{ 'type':'string' }}
+        ]},
+        'allow':  { 'oneOf': [
+            { 'type':'string'},
+            { 'type':'array', 'items':{ 'type':'string' }}
+        ]},
+    }
+)
+
+PROFILE_SCHEMA = dict(
+    type = 'object',
+    properties = dict(
+      service    = SERVICE_SCHEMA,
+      parameters = PARAMETERS_SCHEMA,
+      allowed_referers = REFERER_SCHEMA,
+      allowed_ips = IPS_SCHEMA,
+      accesspolicy = POLICY_SCHEMA
+    )
+)
+
+SCHEMA= dict(
+    type = 'object',
+    properties=dict(
+        autoreload = { 'type': 'boolean' },
+        allow_default_profile = { 'type': 'boolean' },
+        accesspolicy = POLICY_SCHEMA,
+        default  = PROFILE_SCHEMA,
+        profiles = { 'type': 'object', "properties": {
+            'additionalProperties': PROFILE_SCHEMA
+        }}
+    )  
+)
+
 
 class ProfileParseError(Exception):
     pass
@@ -228,7 +292,7 @@ class ProfileMngr:
             mngr.load(profiles)
             return mngr
         except Exception:
-            LOGGER.error("Failed to load profiles %s: %s")
+            LOGGER.error("Failed to load profiles %s", profiles)
             if exit_on_error:
                 traceback.print_exc()
                 sys.exit(1)
@@ -246,6 +310,12 @@ class ProfileMngr:
         LOGGER.info("Reading profiles %s",profiles)
         with open(profiles,'r') as f:
             config = yaml.load(f, Loader=Loader)
+            # Validate configuration
+            try:
+                jsonschema.validate(config, SCHEMA)
+            except jsonschema.exceptions.ValidationError as e:
+                LOGGER.critical("Profile syntax error")
+                raise
         self._profiles = {}
         self._accesspolicy = config.get('accesspolicy') if wps else None
 

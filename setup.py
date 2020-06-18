@@ -5,16 +5,8 @@ def parse_requirements( filename ):
     with open( filename ) as fp:
         return list(filter(None, (r.strip('\n ').partition('#')[0] for r in fp.readlines())))
 
-def load_source(name, path):
-    from importlib.util import spec_from_file_location, module_from_spec
-    spec = spec_from_file_location(name, path)
-    mod  = module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
-
-VER = load_source("version", 'pyqgisservercontrib/profiles/version.py')
-
-version_tag = "{}".format(VER.__version__)
+VERSION = "1.2.0"
+DESCRIPTION = "Qgis server profile filters"
 
 kwargs = {}
 
@@ -28,12 +20,12 @@ if os.path.exists(requirements):
 
 setup(
     name='pyqgiservercontrib-profiles',
-    version=version_tag,
+    version=VERSION,
     author='3Liz',
     author_email='infos@3liz.org',
     maintainer='David Marteau',
     maintainer_email='dmarteau@3liz.org',
-    description=VER.__description__,
+    description=DESCRIPTION,
     url='https://github.com/pyqgiservercontrib-profiles',
     python_requires=">=3.5",
     packages=find_namespace_packages(include=['pyqgisservercontrib.*']),

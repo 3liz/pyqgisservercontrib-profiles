@@ -17,7 +17,7 @@ Example of profile configuration:
 
 ```
 profiles:
-    - myprofile:
+    myprofile:
         services:   # Allowed services
             - WMS
             - WFS
