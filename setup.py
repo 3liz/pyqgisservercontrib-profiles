@@ -15,8 +15,7 @@ with open('README.md') as f:
 
 # Parse requirement file and transform it to setuptools requirements'''
 requirements = 'requirements.txt'
-if os.path.exists(requirements):
-    kwargs['install_requires']=parse_requirements(requirements)
+kwargs['install_requires']=parse_requirements(requirements)
 
 setup(
     name='pyqgiservercontrib-profiles',
