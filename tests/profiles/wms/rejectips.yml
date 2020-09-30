@@ -14,6 +14,8 @@ referer:
   allowed_referers:
     - 'referer/ok'
     - 'http://referer.com/*'
+    - '@RE:http://regexp/\d+/ok'
+    - '@RE:http://longpath/'
   parameters:
     MAP: france_parts.qgs
 

@@ -113,4 +113,31 @@ class Tests(HTTPTestCase):
         rv = self.client.get(uri,path='', headers={ 'Referer': 'http://referer.com/foobar' })
         assert rv.status_code == 200
 
+    def test_referer_regexp_ok(self):
+        """ Test referer filter
+        """
+        uri = ('/ows/p/referer/?exceptions=application/vnd.ogc.se_inimage'
+               '&service=WFS&request=GetCapabilities')
+
+        rv = self.client.get(uri,path='', headers={ 'Referer': 'http://regexp/123/ok' })
+        assert rv.status_code == 200
+
+    def test_referer_regexp_simple_match(self):
+        """ Test referer filter
+        """
+        uri = ('/ows/p/referer/?exceptions=application/vnd.ogc.se_inimage'
+               '&service=WFS&request=GetCapabilities')
+
+        rv = self.client.get(uri,path='', headers={ 'Referer': 'http://longpath/with/multiple/steps' })
+        assert rv.status_code == 200
+
+    def test_referer_regexp_403(self):
+        """ Test referer filter
+        """
+        uri = ('/ows/p/referer/?exceptions=application/vnd.ogc.se_inimage'
+               '&service=WFS&request=GetCapabilities')
+
+        rv = self.client.get(uri,path='', headers={ 'Referer': 'http://regexp/123a/ok' })
+        assert rv.status_code == 403
+
 

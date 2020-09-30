@@ -29,12 +29,13 @@ import yaml
 import traceback
 import functools
 import jsonschema
+import re
 
 from tornado.web import HTTPError, RequestHandler
 
 from yaml.nodes import SequenceNode
 
-from typing import Mapping, TypeVar, Any
+from typing import Mapping, TypeVar, Any, Union
 
 from ipaddress import ip_address, ip_network
 from glob import glob 
@@ -187,14 +188,24 @@ def output_debug_profile(name, p):
                      p._accesspolicy
                   )
 
+REGEXP_PREFIX="@RE:"
+def _match_fun(e):
+    if e.startswith(REGEXP_PREFIX):
+        p = re.compile(e[len(REGEXP_PREFIX):])
+        return lambda r: p.match(r)
+    else:
+        return lambda r: Path(r).match(e)
+
+
 class _Profile:
     
     def __init__(self, data: Mapping[str,Any], wpspolicy: bool=False) -> None:
         self._services    = data.get('services')
         self._parameters  = data.get('parameters',{})
         self._allowed_ips = [ip_network(ip) for ip in data.get('allowed_ips',[])]
-        self._allowed_referers = data.get('allowed_referers')
         self._accesspolicy = data.get('accesspolicy') if wpspolicy else None
+
+        self._allowed_referers = [_match_fun(r) for r in  data.get('allowed_referers',[])]
 
         # 'only' directive
         self._mapfilters  = _to_list(data.get('only',{}).get('map',[]))
@@ -217,7 +228,7 @@ class _Profile:
         """
         if self._allowed_referers:
             referer = request.headers.get('Referer')
-            if referer and any( Path(referer).match(m) for m in self._allowed_referers ):
+            if referer and any( m(referer) for m in self._allowed_referers ):
                 return
             elif len(self._allowed_ips) == 0:
                 # No ips to check: return failure
