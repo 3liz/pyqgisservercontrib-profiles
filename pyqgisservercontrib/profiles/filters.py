@@ -35,7 +35,7 @@ from tornado.web import HTTPError, RequestHandler
 
 from yaml.nodes import SequenceNode
 
-from typing import Mapping, TypeVar, Any, Union
+from typing import Mapping, TypeVar, Any, Union, Optional
 
 from ipaddress import ip_address, ip_network
 from glob import glob 
@@ -210,7 +210,7 @@ class _Profile:
         # 'only' directive
         self._mapfilters  = _to_list(data.get('only',{}).get('map',[]))
 
-    def test_services(self, request: HTTPRequest) -> None:
+    def test_services(self, request: HTTPRequest, endpoint: Optional[str] = None) -> None:
         """ Test allowed services
         """
         if not self._services:
@@ -220,8 +220,13 @@ class _Profile:
             service = service[-1]
             if isinstance(service,bytes):
                 service = service.decode()
-            if not service in self._services:
-                raise ProfileError("Rejected service %s" % service)
+        else: 
+            # Check wfs3 service
+            if endpoint and endpoint.startswith('/wfs3'):
+                service = 'WFS'
+
+        if service and service not in self._services:
+            raise ProfileError("Rejected service %s" % service)
 
     def test_allowed_referers_or_ips(self, request: HTTPRequest, http_proxy: bool) -> None:
         """ Test allowed referers or ips
@@ -280,7 +285,7 @@ class _Profile:
         """
         request = handler.request
         request.arguments.update((k,[v.encode()]) for k,v in  self._parameters.items())
-        self.test_services(request)
+        self.test_services(request, handler.path_kwargs.get('endpoint'))
         if with_referer:
             self.test_allowed_referers_or_ips(request, http_proxy)
         else:
@@ -393,12 +398,13 @@ def register_policy( collection, wpspolicy=False ) -> None:
             if not mngr.apply_profile('default', handler, http_proxy, with_referer=with_referer):
                 raise HTTPError(403,reason="Unauthorized profile")
 
-        @blockingfilter(pri=-1000, uri=r"p/(?P<profile>.*)")
-        def profile_filter( handler: RequestHandler ) -> None:
+        @blockingfilter(pri=-1000, uri=r"p/(?P<profile>(?:(?!/wfs3/?).)*)")
+        def profile_filter( handler: RequestHandler ) -> str:
             # Remove profile from argument list
             profile = handler.path_kwargs.pop('profile')
             if not mngr.apply_profile(profile, handler, http_proxy, with_referer=with_referer):
                 raise HTTPError(403,reason="Unauthorized profile")
+            return f"p/{profile}"
 
         collection.extend([profile_filter, default_filter])
 

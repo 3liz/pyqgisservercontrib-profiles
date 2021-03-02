@@ -140,4 +140,20 @@ class Tests(HTTPTestCase):
         rv = self.client.get(uri,path='', headers={ 'Referer': 'http://regexp/123a/ok' })
         assert rv.status_code == 403
 
+    def test_wfs3_profile(self):
+        """ Test profile located in subdir
+        """
+        uri = ('/ows/p/wfsonly/wfs3/')
+
+        rv = self.client.get(uri,path='')
+        assert rv.status_code == 200
+
+    def test_wfs3_profile_rejected(self):
+        """ Test wfs3 profile is rejected
+        """
+        uri = ('/ows/p/wmsonly/wfs3/')
+
+        rv = self.client.get(uri,path='')
+        assert rv.status_code == 403
+
 

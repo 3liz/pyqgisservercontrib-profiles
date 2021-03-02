@@ -1,6 +1,6 @@
 ---
 
-allow_default_profile: yes
+allow_default_profile: no
 
 autoreload: yes
 
