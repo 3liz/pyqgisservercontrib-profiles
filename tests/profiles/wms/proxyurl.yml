@@ -1,0 +1,12 @@
+
+### Define profile with proxy url
+proxyurls:
+  services: 
+    - WMS
+    - WFS
+  parameters:
+    MAP: france_parts.qgs
+  urls:
+    WMS: 'https://wms.url/path/'
+    WFS: 'https://wfs.url/path/'
+

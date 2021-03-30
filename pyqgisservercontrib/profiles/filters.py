@@ -88,14 +88,22 @@ POLICY_SCHEMA = dict(
     }
 )
 
+
+URL_SCHEMA = dict(
+    type = 'object',
+    properties={ 'additionalProperties': { 'type': 'string' }}
+)
+
+
 PROFILE_SCHEMA = dict(
     type = 'object',
     properties = dict(
-      service    = SERVICE_SCHEMA,
+      service = SERVICE_SCHEMA,
       parameters = PARAMETERS_SCHEMA,
       allowed_referers = REFERER_SCHEMA,
       allowed_ips = IPS_SCHEMA,
-      accesspolicy = POLICY_SCHEMA
+      accesspolicy = POLICY_SCHEMA,
+      urls = URL_SCHEMA,
     )
 )
 
@@ -204,17 +212,16 @@ class _Profile:
         self._parameters  = data.get('parameters',{})
         self._allowed_ips = [ip_network(ip) for ip in data.get('allowed_ips',[])]
         self._accesspolicy = data.get('accesspolicy') if wpspolicy else None
+        self._urls = data.get('urls')
 
         self._allowed_referers = [_match_fun(r) for r in  data.get('allowed_referers',[])]
 
         # 'only' directive
         self._mapfilters  = _to_list(data.get('only',{}).get('map',[]))
 
-    def test_services(self, request: HTTPRequest, endpoint: Optional[str] = None) -> None:
-        """ Test allowed services
+    def get_service(self, request: HTTPRequest, endpoint: Optional[str] = None) -> str:
+        """ Return  request service
         """
-        if not self._services:
-            return
         service = request.arguments.get('SERVICE')
         if service:
             service = service[-1]
@@ -225,7 +232,15 @@ class _Profile:
             if endpoint and endpoint.startswith('/wfs3'):
                 service = 'WFS'
 
-        if service and service not in self._services:
+        return service
+
+    def test_services(self, request: HTTPRequest, service: str) -> None:
+        """ Test allowed services
+        """
+        if not self._services:
+            return
+
+        if self._services and service and service not in self._services:
             raise ProfileError("Rejected service %s" % service)
 
     def test_allowed_referers_or_ips(self, request: HTTPRequest, http_proxy: bool) -> None:
@@ -279,13 +294,26 @@ class _Profile:
         if not any( test.match(m) for m in maps ):
             raise ProfileError("Rejected MAP: %s" % test)
 
+    def test_urls( self, request: HTTPRequest, service: str ) -> None:
+        """ Override 'X-Forwarded-Url' header
+        """
+        if not self._urls:
+            return
+        # Retrieve url associated to the service
+        # and override the 'X-Forwarded-Url' header
+        url = self._urls.get(service)
+        if url:
+            request.headers['X-Forwarded-Url'] = url
 
     def apply(self, handler: RequestHandler, http_proxy: bool, with_referer: bool=False) -> None:
         """ Apply profiles constraints
         """
         request = handler.request
         request.arguments.update((k,[v.encode()]) for k,v in  self._parameters.items())
-        self.test_services(request, handler.path_kwargs.get('endpoint'))
+        
+        service = self.get_service(request, handler.path_kwargs.get('endpoint'))
+        self.test_services(request, service)
+        self.test_urls(request, service)
         if with_referer:
             self.test_allowed_referers_or_ips(request, http_proxy)
         else:

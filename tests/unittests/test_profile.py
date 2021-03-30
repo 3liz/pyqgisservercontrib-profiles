@@ -2,6 +2,15 @@
     Test profiles
 """
 from pyqgisserver.tests import HTTPTestCase
+from urllib.parse import urlparse
+
+ns = { 
+    "wms": "http://www.opengis.net/wms",
+    "ows": "http://www.opengis.net/ows",
+}
+
+xlink = "{http://www.w3.org/1999/xlink}"
+
 
 class Tests(HTTPTestCase):
 
@@ -156,4 +165,54 @@ class Tests(HTTPTestCase):
         rv = self.client.get(uri,path='')
         assert rv.status_code == 403
 
+    def test_wms_proxy_url(self):
+        """ Test proxy urls definitions
+        """
+        uri = ('/ows/p/proxyurls/?service=WMS&request=GetCapabilities')
+        
+        rv = self.client.get(uri,path='')
+        assert rv.status_code == 200
+        assert rv.headers['Content-Type'] == 'text/xml; charset=utf-8'
+        elem = rv.xml.findall(".//wms:OnlineResource", ns)
+        assert len(elem) > 0
 
+        urlref = urlparse('https://wms.url/path/')
+
+        href = urlparse(elem[0].get(xlink+'href'))
+        assert href.scheme   == urlref.scheme
+        assert href.hostname == urlref.hostname
+        assert href.path     == urlref.path
+
+    def test_wfs_urls_profile(self):
+        """ Test proxy urls definitions
+        """
+        uri = ('/ows/p/proxyurls/?service=WFS&request=GetCapabilities')
+
+        rv = self.client.get(uri,path='')
+        assert rv.status_code == 200
+        assert rv.headers['Content-Type'] == 'text/xml; charset=utf-8'
+        elem = rv.xml.findall(".//ows:Get", ns)
+        assert len(elem) > 0
+
+        urlref = urlparse('https://wfs.url/path/')
+
+        href = urlparse(elem[0].get(xlink+'href'))
+        assert href.scheme   == urlref.scheme
+        assert href.hostname == urlref.hostname
+        assert href.path     == urlref.path
+
+    def test_wfs3_urls_profile(self):
+        """ Test proxy urls definitions
+        """
+        uri = ('/ows/p/proxyurls/wfs3/')
+        rv = self.client.get(uri,path='')
+        assert rv.status_code == 200
+        assert rv.headers['Content-Type'] == 'application/json'
+
+        data = rv.json()
+        href = urlparse(data['links'][0]['href'])
+
+        urlref = urlparse('https://wfs.url/path/')
+        assert href.scheme   == urlref.scheme
+        assert href.hostname == urlref.hostname
+        assert href.path.startswith(urlref.path)
