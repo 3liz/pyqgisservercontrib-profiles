@@ -65,11 +65,11 @@ run: local
 		-e QGSRV_SERVER_WORKERS=$(WORKERS) \
 		-e QGSRV_CACHE_ROOTDIR=/src/tests/data \
 		-e QGSRV_TEST_PROTOCOL=/src/tests/data \
-		-e QGSRV_SERVER_PROFILES=/src/tests/profiles.yml \
+		-e QGSRV_CONTRIB_PROFILES_CONFIG=/src/tests/profiles.yml \
+		-e QGSRV_CONTRIB_PROFILES_WITH_REFERER=yes \
 		-e QGSRV_SERVER_RESTARTMON=/src/.qgis-restart \
 		-e QGSRV_SERVER_HTTP_PROXY=yes \
 		-e QGSRV_LOGGING_LEVEL=DEBUG \
-		-e QGSRV_SERVER_PLUGINPATH=/plugins \
 		-e PYTHONWARNINGS=d \
 		-e QGIS_OPTIONS_PATH=/src/tests/qgis \
 		-e QGSRV_DATA_PATH=/.local/share/qgis-server \
