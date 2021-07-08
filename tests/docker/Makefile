@@ -60,7 +60,6 @@ run: local
 		-v $$(pwd)/.local:/.local \
 		-v $$(pwd)/server.conf:/server.conf \
 		-v $(LOCAL_HOME)/.cache:/.cache \
-		-v $(PLUGINPATH):/plugins \
 		-e PIP_CACHE_DIR=/.cache \
 		-e QGSRV_SERVER_WORKERS=$(WORKERS) \
 		-e QGSRV_CACHE_ROOTDIR=/src/tests/data \

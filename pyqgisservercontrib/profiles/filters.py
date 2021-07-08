@@ -95,6 +95,9 @@ URL_SCHEMA = dict(
 )
 
 
+__access_policy_version__ = 1
+
+
 PROFILE_SCHEMA = dict(
     type = 'object',
     properties = dict(
@@ -207,7 +210,8 @@ def _match_fun(e):
 
 class _Profile:
     
-    def __init__(self, data: Mapping[str,Any], wpspolicy: bool=False) -> None:
+    def __init__(self, name: str, data: Mapping[str,Any], wpspolicy: bool=False) -> None:
+        self._name        = name
         self._services    = data.get('services')
         self._parameters  = data.get('parameters',{})
         self._allowed_ips = [ip_network(ip) for ip in data.get('allowed_ips',[])]
@@ -304,6 +308,8 @@ class _Profile:
         url = self._urls.get(service)
         if url:
             request.headers['X-Forwarded-Url'] = url
+        elif __access_policy_version___ >= 2:
+            request.headers['X-Forwarded-Url'] = f"{request.protocol}://{request.host}/ows/p/{self._name}"
 
     def apply(self, handler: RequestHandler, http_proxy: bool, with_referer: bool=False) -> None:
         """ Apply profiles constraints
@@ -365,8 +371,8 @@ class ProfileMngr:
 
         allow_default = config.get('allow_default_profile', True)
         if allow_default:
-            self._profiles['default'] = _Profile(config.get('default',{}), wpspolicy=wps)
-        self._profiles.update( (k,_Profile(v,wpspolicy=wps)) for k,v in config.get('profiles',{}).items() )
+            self._profiles['default'] = _Profile('default',config.get('default',{}), wpspolicy=wps)
+        self._profiles.update( (k,_Profile(k,v,wpspolicy=wps)) for k,v in config.get('profiles',{}).items() )
 
         # Configure auto reload
         if config.get('autoreload', False):
@@ -410,7 +416,11 @@ def register_policy( collection, wpspolicy=False ) -> None:
     """
     from  pyqgisservercontrib.core import componentmanager
     configservice  = componentmanager.get_service('@3liz.org/config-service;1')
-    
+  
+    # Retrieve application version
+    global __access_policy_version__
+    __access_policy_version___ = configservice.getint('server','access_policy_version', fallback=1)
+
     configservice.add_section('contrib:profiles')
 
     with_profiles = configservice.get('server','profiles', fallback=None) or \
@@ -432,6 +442,7 @@ def register_policy( collection, wpspolicy=False ) -> None:
             profile = handler.path_kwargs.pop('profile')
             if not mngr.apply_profile(profile, handler, http_proxy, with_referer=with_referer):
                 raise HTTPError(403,reason="Unauthorized profile")
+            # Keep this for compatibility with access_policy_version < 2
             return f"p/{profile}"
 
         collection.extend([profile_filter, default_filter])
