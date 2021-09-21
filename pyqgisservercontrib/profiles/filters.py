@@ -95,9 +95,6 @@ URL_SCHEMA = dict(
 )
 
 
-__access_policy_version__ = 1
-
-
 PROFILE_SCHEMA = dict(
     type = 'object',
     properties = dict(
@@ -216,7 +213,7 @@ class _Profile:
         self._parameters  = data.get('parameters',{})
         self._allowed_ips = [ip_network(ip) for ip in data.get('allowed_ips',[])]
         self._accesspolicy = data.get('accesspolicy') if wpspolicy else None
-        self._urls = data.get('urls')
+        self._urls = data.get('urls',{})
 
         self._allowed_referers = [_match_fun(r) for r in  data.get('allowed_referers',[])]
 
@@ -301,15 +298,14 @@ class _Profile:
     def test_urls( self, request: HTTPRequest, service: str ) -> None:
         """ Override 'X-Forwarded-Url' header
         """
-        if not self._urls:
-            return
         # Retrieve url associated to the service
         # and override the 'X-Forwarded-Url' header
         url = self._urls.get(service)
         if url:
             request.headers['X-Forwarded-Url'] = url
-        elif __access_policy_version___ >= 2:
+        else:
             request.headers['X-Forwarded-Url'] = f"{request.protocol}://{request.host}/ows/p/{self._name}"
+        LOGGER.debug("======================### %s", request.headers['X-Forwarded-Url'])
 
     def apply(self, handler: RequestHandler, http_proxy: bool, with_referer: bool=False) -> None:
         """ Apply profiles constraints
@@ -417,10 +413,6 @@ def register_policy( collection, wpspolicy=False ) -> None:
     from  pyqgisservercontrib.core import componentmanager
     configservice  = componentmanager.get_service('@3liz.org/config-service;1')
   
-    # Retrieve application version
-    global __access_policy_version__
-    __access_policy_version___ = configservice.getint('server','access_policy_version', fallback=1)
-
     configservice.add_section('contrib:profiles')
 
     with_profiles = configservice.get('server','profiles', fallback=None) or \

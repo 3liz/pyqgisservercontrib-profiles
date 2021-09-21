@@ -63,10 +63,19 @@ class Tests(HTTPTestCase):
     def test_wfs_profile(self):
         """ Test profile located in subdir
         """
-        uri = ('/ows/p/wfsonly/')
+        uri = ('/ows/p/wfsonly/?service=WFS&request=GetCapabilities')
 
         rv = self.client.get(uri,path='')
         assert rv.status_code == 200
+        assert rv.headers['Content-Type'] == 'text/xml; charset=utf-8'
+        elem = rv.xml.findall(".//ows:Get", ns)
+        assert len(elem) > 0
+
+        urlref = urlparse(uri)
+
+        href = urlparse(elem[0].get(xlink+'href'))
+        assert href.path == urlref.path.rstrip('/')
+
 
     def test_map_only_ok(self):
         """ Test the 'only' directive
