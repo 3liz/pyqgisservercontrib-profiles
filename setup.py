@@ -5,7 +5,7 @@ def parse_requirements( filename ):
     with open( filename ) as fp:
         return list(filter(None, (r.strip('\n ').partition('#')[0] for r in fp.readlines())))
 
-VERSION = "1.3.1"
+VERSION = "1.3.2"
 DESCRIPTION = "Qgis server profile filters"
 
 kwargs = {}

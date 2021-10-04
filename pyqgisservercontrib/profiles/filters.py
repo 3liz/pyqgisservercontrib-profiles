@@ -42,7 +42,7 @@ from glob import glob
 from pathlib import Path
 
 
-LOGGER = logging.getLogger('SRVLOG')
+LOGGER = logging.getLogger('SRVLOG.profiles')
 
 # Define an abstract type for HTTPRequest
 HTTPRequest = TypeVar('HTTPRequest')
@@ -303,9 +303,11 @@ class _Profile:
         url = self._urls.get(service)
         if url:
             request.headers['X-Forwarded-Url'] = url
+            # Supported in Qgis 3.20+, replace the complete url (query params included...)
+            # As 3.20.3 does not work with WFS3
+            request.headers['X-Qgis-Service-Url'] = url
         else:
             request.headers['X-Forwarded-Url'] = f"{request.protocol}://{request.host}/ows/p/{self._name}"
-        LOGGER.debug("======================### %s", request.headers['X-Forwarded-Url'])
 
     def apply(self, handler: RequestHandler, http_proxy: bool, with_referer: bool=False) -> None:
         """ Apply profiles constraints

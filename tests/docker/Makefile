@@ -12,6 +12,7 @@ REGISTRY_PREFIX=$(REGISTRY_URL)/
 QGIS_IMAGE=$(REGISTRY_PREFIX)qgis-map-server:$(FLAVOR)
 
 SERVER_HTTP_PORT:=127.0.0.1:8888
+SERVER_MANAGMENT_PORT:=127.0.0.1:19876
 
 BECOME_USER:=$(shell id -u)
 
@@ -45,6 +46,10 @@ test: local
 		-e QGSRV_SERVER_HTTP_PROXY=yes \
 		-e QGIS_OPTIONS_PATH=/src/tests/qgis \
 		-e QGSRV_LOGGING_LEVEL=DEBUG \
+		-e QGSRV_SERVER_STATUS_PAGE=yes \
+		-e QGSRV_MANAGEMENT_ENABLED=yes \
+		-e QGSRV_MANAGEMENT_INTERFACES=0.0.0.0 \
+		-e QGSRV_API_ENABLED_LANDING_PAGE=yes \
 		-e PYTEST_ADDOPTS="$(PYTEST_ADDOPTS)" \
 		--entrypoint $(SCRIPTS)/run_tests.sh \
 		$(QGIS_IMAGE)
@@ -54,7 +59,9 @@ WORKERS:=1
 
 run: local
 	echo -n "Restart qgis" > .qgis-restart
-	docker run -it --rm -p $(SERVER_HTTP_PORT):8080 --name qgis-py-server-run-$(COMMITID) -w /src \
+	docker run -it --rm -p $(SERVER_HTTP_PORT):8080 \
+		-p $(SERVER_MANAGMENT_PORT):19876 \
+		--name qgis-py-server-run-$(COMMITID) -w /src \
 		-u $(BECOME_USER) \
 		-v $(SRCDIR):/src \
 		-v $$(pwd)/.local:/.local \
@@ -72,6 +79,10 @@ run: local
 		-e PYTHONWARNINGS=d \
 		-e QGIS_OPTIONS_PATH=/src/tests/qgis \
 		-e QGSRV_DATA_PATH=/.local/share/qgis-server \
+		-e QGSRV_SERVER_STATUS_PAGE=yes \
+		-e QGSRV_MANAGEMENT_ENABLED=yes \
+		-e QGSRV_MANAGEMENT_INTERFACES=0.0.0.0 \
+		-e QGSRV_API_ENABLED_LANDING_PAGE=yes \
 		--entrypoint $(SCRIPTS)/run_server.sh \
 		$(QGIS_IMAGE)
 

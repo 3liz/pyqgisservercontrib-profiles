@@ -42,7 +42,7 @@ dist: dirs manifest
 clean:
 	rm -rf $(BUILDDIR)
 
-docker-%:
+test-%:
 	$(MAKE) -C tests/docker $* FLAVOR=$(FLAVOR)
 
 
