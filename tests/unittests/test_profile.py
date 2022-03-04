@@ -191,6 +191,28 @@ class Tests(HTTPTestCase):
         assert href.scheme   == urlref.scheme
         assert href.hostname == urlref.hostname
         assert href.path     == urlref.path
+        assert href.query    == ""
+
+
+    def test_proxy_no_service_url(self):
+        """ Test proxy urls definitions
+        """
+        uri = ('/ows/p/proxy_no_service_urls/?service=WMS&request=GetCapabilities')
+        
+        rv = self.client.get(uri,path='')
+        assert rv.status_code == 200
+        assert rv.headers['Content-Type'] == 'text/xml; charset=utf-8'
+        elem = rv.xml.findall(".//wms:OnlineResource", ns)
+        assert len(elem) > 0
+
+        urlref = urlparse('https://wms.url/path/')
+
+        href = urlparse(elem[0].get(xlink+'href'))
+        assert href.scheme   == urlref.scheme
+        assert href.hostname == urlref.hostname
+        assert href.path     == urlref.path
+        assert href.query    == "MAP=france_parts.qgs"
+
 
     def test_wfs_urls_profile(self):
         """ Test proxy urls definitions
@@ -209,6 +231,8 @@ class Tests(HTTPTestCase):
         assert href.scheme   == urlref.scheme
         assert href.hostname == urlref.hostname
         assert href.path     == urlref.path
+        assert href.query    == ""
+
 
     def test_wfs3_urls_profile(self):
         """ Test proxy urls definitions

@@ -5,7 +5,7 @@ def parse_requirements( filename ):
     with open( filename ) as fp:
         return list(filter(None, (r.strip('\n ').partition('#')[0] for r in fp.readlines())))
 
-VERSION = "1.3.2"
+VERSION = "1.3.3"
 DESCRIPTION = "Qgis server profile filters"
 
 kwargs = {}
@@ -31,13 +31,20 @@ setup(
     entry_points={
         'qgssrv_contrib_access_policy': [
             'profile-policy = pyqgisservercontrib.profiles.filters:register_policy',
-        ]
+        ],
+        'py_qgis_server.access_policy': [
+            'profile-policy = pyqgisservercontrib.profiles.filters:register_policy',
+        ],
+        'py_qgis_wps.access_policy': [
+            'profile-policy = pyqgisservercontrib.profiles.filters:register_policy',
+        ] 
     },
     namespace_packages=['pyqgisservercontrib'],
     classifiers=[
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.6",
-        "Programming Language :: Python :: 3.5",
         "Programming Language :: Python :: 3",
         "Operating System :: POSIX :: Linux",
     ],

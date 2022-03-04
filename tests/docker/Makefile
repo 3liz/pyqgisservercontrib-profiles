@@ -25,19 +25,10 @@ SRCDIR=$(shell realpath ../..)
 SCRIPTS=./tests/docker
 
 
-local:
-	rm -rf $$(pwd)/.local
-	mkdir -p  $$(pwd)/.local  $(LOCAL_HOME)/.cache
-
-
-test: local
+test:
 	echo -n "Restart qgis" > .qgis-restart
 	docker run --rm --name qgis-py-server-test-$(COMMITID) -w /src \
-		-u $(BECOME_USER) \
 		-v $(SRCDIR):/src \
-		-v $$(pwd)/.local:/.local \
-		-v $(LOCAL_HOME)/.cache:/.cache \
-		-e PIP_CACHE_DIR=/.cache \
 		-e QGSRV_TEST_PROTOCOL=/src/tests/data \
 		-e QGSRV_CONTRIB_PROFILES_CONFIG=/src/tests/profiles.yml \
 		-e QGSRV_CONTRIB_PROFILES_WITH_REFERER=yes \
@@ -51,23 +42,20 @@ test: local
 		-e QGSRV_MANAGEMENT_INTERFACES=0.0.0.0 \
 		-e QGSRV_API_ENABLED_LANDING_PAGE=yes \
 		-e PYTEST_ADDOPTS="$(PYTEST_ADDOPTS)" \
+		-e BECOME_USER=$(BECOME_USER) \
 		--entrypoint $(SCRIPTS)/run_tests.sh \
 		$(QGIS_IMAGE)
 
 
 WORKERS:=1
 
-run: local
+run:
 	echo -n "Restart qgis" > .qgis-restart
 	docker run -it --rm -p $(SERVER_HTTP_PORT):8080 \
 		-p $(SERVER_MANAGMENT_PORT):19876 \
 		--name qgis-py-server-run-$(COMMITID) -w /src \
-		-u $(BECOME_USER) \
 		-v $(SRCDIR):/src \
-		-v $$(pwd)/.local:/.local \
 		-v $$(pwd)/server.conf:/server.conf \
-		-v $(LOCAL_HOME)/.cache:/.cache \
-		-e PIP_CACHE_DIR=/.cache \
 		-e QGSRV_SERVER_WORKERS=$(WORKERS) \
 		-e QGSRV_CACHE_ROOTDIR=/src/tests/data \
 		-e QGSRV_TEST_PROTOCOL=/src/tests/data \
@@ -83,6 +71,7 @@ run: local
 		-e QGSRV_MANAGEMENT_ENABLED=yes \
 		-e QGSRV_MANAGEMENT_INTERFACES=0.0.0.0 \
 		-e QGSRV_API_ENABLED_LANDING_PAGE=yes \
+		-e BECOME_USER=$(BECOME_USER) \
 		--entrypoint $(SCRIPTS)/run_server.sh \
 		$(QGIS_IMAGE)
 

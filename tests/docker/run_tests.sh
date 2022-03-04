@@ -2,17 +2,25 @@
 
 set -e
 
-# Add /.local to path
-export PATH=$PATH:/.local/bin
-
 echo "-- HOME is $HOME"
 
-echo "-- Installing required packages..."
-pip3 install -q -U --user setuptools
-pip3 install -q -U --prefer-binary --user -r requirements.tests
-pip3 install -q -U --prefer-binary --user -r requirements.txt
+VENV_PATH=/opt/local/pyqgisserver
 
-pip3 install -q --user -e ./
+if [ "$(id -u)" == "0" ]; then
+
+PIP="$VENV_PATH/bin/pip"
+PIP_INSTALL="$VENV_PATH/bin/pip install -U"
+
+echo "-- Installing required packages..."
+$PIP_INSTALL -q pip setuptools
+$PIP_INSTALL -q --prefer-binary -r requirements.tests
+$PIP_INSTALL -q --prefer-binary -r requirements.txt
+
+$PIP_INSTALL -q -e ./
+
+exec gosu $BECOME_USER "$BASH_SOURCE" "$@"
+
+fi 
 
 export QGIS_DISABLE_MESSAGE_HOOKS=1
 export QGIS_NO_OVERRIDE_IMPORT=1
@@ -21,5 +29,5 @@ export QGIS_NO_OVERRIDE_IMPORT=1
 export QT_LOGGING_RULES="*.debug=false;*.warning=false"
 
 # Run new tests
-cd tests/unittests && pytest -v $@
+cd tests/unittests && $VENV_PATH/bin/pytest -v $@
 

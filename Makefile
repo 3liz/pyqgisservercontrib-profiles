@@ -46,6 +46,9 @@ test-%:
 	$(MAKE) -C tests/docker $* FLAVOR=$(FLAVOR)
 
 
-test: 
+lint:
+	@flake8 pyqgisservercontrib
+
+test: lint
 	$(MAKE) -C tests/docker test FLAVOR=$(FLAVOR)
 

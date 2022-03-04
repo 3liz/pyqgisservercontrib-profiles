@@ -10,3 +10,13 @@ proxyurls:
     WMS: 'https://wms.url/path/'
     WFS: 'https://wfs.url/path/'
 
+proxy_no_service_urls:
+  services: 
+    - WMS
+  parameters:
+    MAP: france_parts.qgs
+  urls:
+    WMS:
+      url: 'https://wms.url/path/'
+      serviceURL: no
+

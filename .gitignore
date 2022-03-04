@@ -36,5 +36,5 @@ docker-test.log
 
 /tests/data/montpellier
 
-qgis.db
-
+tests/qgis/*.db
+tests/qgis/*.xml

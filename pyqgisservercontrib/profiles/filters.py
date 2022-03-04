@@ -27,7 +27,6 @@ import sys
 import logging
 import yaml
 import traceback
-import functools
 import jsonschema
 import re
 
@@ -35,24 +34,23 @@ from tornado.web import HTTPError, RequestHandler
 
 from yaml.nodes import SequenceNode
 
-from typing import Mapping, TypeVar, Any, Union, Optional
+from typing import Mapping, TypeVar, Any, Optional
 
 from ipaddress import ip_address, ip_network
 from glob import glob 
 from pathlib import Path
 
+from pyqgisservercontrib.core.watchfiles import watchfiles
+from pyqgisservercontrib.core.filters import blockingfilter
 
 LOGGER = logging.getLogger('SRVLOG.profiles')
 
 # Define an abstract type for HTTPRequest
 HTTPRequest = TypeVar('HTTPRequest')
-
-from pyqgisservercontrib.core.watchfiles import watchfiles
-from pyqgisservercontrib.core.filters import blockingfilter
-
 #
 # Schema for profiles
 #
+
 SERVICE_SCHEMA = dict(
     type='array',
     items={ 'type':'string' },
@@ -91,19 +89,29 @@ POLICY_SCHEMA = dict(
 
 URL_SCHEMA = dict(
     type = 'object',
-    properties={ 'additionalProperties': { 'type': 'string' }}
+    properties={ 'additionalProperties': { 'oneOf': [
+        { 'type': 'string' },
+        dict(
+            type='object',
+            properties={
+                'url': { 'type':'string' },
+                'serviceURL': { "type": "boolean" },
+            },
+            required=["url"],
+        ),
+    ]}}
 )
 
 
 PROFILE_SCHEMA = dict(
     type = 'object',
     properties = dict(
-      service = SERVICE_SCHEMA,
-      parameters = PARAMETERS_SCHEMA,
-      allowed_referers = REFERER_SCHEMA,
-      allowed_ips = IPS_SCHEMA,
-      accesspolicy = POLICY_SCHEMA,
-      urls = URL_SCHEMA,
+        service = SERVICE_SCHEMA,
+        parameters = PARAMETERS_SCHEMA,
+        allowed_referers = REFERER_SCHEMA,
+        allowed_ips = IPS_SCHEMA,
+        accesspolicy = POLICY_SCHEMA,
+        urls = URL_SCHEMA,
     )
 )
 
@@ -133,7 +141,7 @@ def _to_list( arg ):
     elif isinstance(arg,str):
         return arg.split(',')
     else:
-        raise ProfileParseError("Expecting 'list' not %s" % type(s))
+        raise ProfileParseError("Expecting 'list' not %s" % type(arg))
 
 
 class Loader(yaml.SafeLoader):
@@ -182,19 +190,13 @@ class ProfileError(Exception):
     """
 
 def output_debug_profile(name, p):
-    LOGGER.debug(("===== Checking matching profile <%s>:\n"
-                  "* services: %s\n"
-                  "* parameters: %s\n"
-                  "* allowed ips: %s\n"
-                  "* allowed referers: %s\n"
-                  "* access policy: %s\n"
-                  ), name,
-                     p._services,
-                     p._parameters,
-                     p._allowed_ips,
-                     p._allowed_referers,
-                     p._accesspolicy
-                  )
+    LOGGER.debug((f"===== Checking matching profile <{name}>:\n"
+                  "* services: {p._services}\n"
+                  "* parameters: {p._parameters}\n"
+                  "* allowed ips: {p._allowed_ips}\n"
+                  "* allowed referers: {p._allowed_referers}\n"
+                  "* access policy: {p._accesspolicy}\n"
+                  )),
 
 REGEXP_PREFIX="@RE:"
 def _match_fun(e):
@@ -213,7 +215,14 @@ class _Profile:
         self._parameters  = data.get('parameters',{})
         self._allowed_ips = [ip_network(ip) for ip in data.get('allowed_ips',[])]
         self._accesspolicy = data.get('accesspolicy') if wpspolicy else None
-        self._urls = data.get('urls',{})
+
+        # Urls have two different forms, use one
+        def _url2dict( item ):
+            if isinstance(item, str):
+                item={ 'url': item, 'serviceURL': True } 
+            return item
+
+        self._urls = { k: _url2dict(v) for k,v in data.get('urls',{}).items() }
 
         self._allowed_referers = [_match_fun(r) for r in  data.get('allowed_referers',[])]
 
@@ -302,10 +311,11 @@ class _Profile:
         # and override the 'X-Forwarded-Url' header
         url = self._urls.get(service)
         if url:
-            request.headers['X-Forwarded-Url'] = url
+            request.headers['X-Forwarded-Url'] = url['url']
             # Supported in Qgis 3.20+, replace the complete url (query params included...)
             # As 3.20.3 does not work with WFS3
-            request.headers['X-Qgis-Service-Url'] = url
+            if url['serviceURL']:
+                request.headers['X-Qgis-Service-Url'] = url['url']
         else:
             request.headers['X-Forwarded-Url'] = f"{request.protocol}://{request.host}/ows/p/{self._name}"
 
@@ -361,7 +371,7 @@ class ProfileMngr:
             # Validate configuration
             try:
                 jsonschema.validate(config, SCHEMA)
-            except jsonschema.exceptions.ValidationError as e:
+            except jsonschema.exceptions.ValidationError:
                 LOGGER.critical("Profile syntax error")
                 raise
         self._profiles = {}
@@ -377,8 +387,8 @@ class ProfileMngr:
             if self._autoreload is None:
                 check_time = config.get('autoreload_check_time', 3000)
                 self._autoreload = watchfiles([profiles], 
-                        lambda modified_files: self.load(profiles), 
-                        check_time=check_time)
+                                              lambda modified_files: self.load(profiles), 
+                                              check_time=check_time)
             if not self._autoreload.is_running():
                 LOGGER.info("Enabling profiles autoreload")
                 self._autoreload.start()
@@ -392,7 +402,8 @@ class ProfileMngr:
         """
         try:
             # name may be a path like string
-            if name: name = name.strip('/')
+            if name: 
+                name = name.strip('/')
             profile = self._profiles.get(name or 'default')
             if profile is None:
                 raise ProfileError("Unknown profile")
@@ -417,8 +428,10 @@ def register_policy( collection, wpspolicy=False ) -> None:
   
     configservice.add_section('contrib:profiles')
 
-    with_profiles = configservice.get('server','profiles', fallback=None) or \
-                    configservice.get('contrib:profiles' , 'config', fallback=None)
+    with_profiles = \
+        configservice.get('server','profiles', fallback=None) or \
+        configservice.get('contrib:profiles' , 'config', fallback=None)
+
     if with_profiles:
         http_proxy = configservice.getboolean('server','http_proxy',False)
         mngr = ProfileMngr.initialize(with_profiles, wpspolicy=wpspolicy)
