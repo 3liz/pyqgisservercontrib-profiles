@@ -191,11 +191,11 @@ class ProfileError(Exception):
 
 def output_debug_profile(name, p):
     LOGGER.debug((f"===== Checking matching profile <{name}>:\n"
-                  "* services: {p._services}\n"
-                  "* parameters: {p._parameters}\n"
-                  "* allowed ips: {p._allowed_ips}\n"
-                  "* allowed referers: {p._allowed_referers}\n"
-                  "* access policy: {p._accesspolicy}\n"
+                  f"* services: {p._services}\n"
+                  f"* parameters: {p._parameters}\n"
+                  f"* allowed ips: {p._allowed_ips}\n"
+                  f"* allowed referers: {p._allowed_referers}\n"
+                  f"* access policy: {p._accesspolicy}\n"
                   )),
 
 REGEXP_PREFIX="@RE:"
