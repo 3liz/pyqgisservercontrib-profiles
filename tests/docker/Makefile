@@ -1,115 +1,74 @@
 SHELL:=bash
+.ONESHELL:
+.PHONY: env
+
 # 
 #  Makefile for running server in docker containers
 #
-COMMITID=$(shell git rev-parse --short HEAD)
 
 FLAVOR:=ltr
 
 REGISTRY_URL ?= 3liz
 REGISTRY_PREFIX=$(REGISTRY_URL)/
 
-QGIS_IMAGE=$(REGISTRY_PREFIX)qgis-map-server:$(FLAVOR)
+QGIS_IMAGE:=$(REGISTRY_PREFIX)qgis-platform:$(FLAVOR)
 
 SERVER_HTTP_PORT:=127.0.0.1:8888
 SERVER_MANAGMENT_PORT:=127.0.0.1:19876
 
-BECOME_USER:=$(shell id -u)
-
-ifndef LOCAL_HOME
-	LOCAL_HOME=$(shell pwd)
-endif
+BECOME_USER:=$(shell id -u):$(shell id -g)
 
 SRCDIR=$(shell realpath ../..)
 
+PLUGINPATH:=$(SRCDIR)/tests/plugins
+
 SCRIPTS=./tests/docker
 
+local:
+	mkdir -p $$(pwd)/.local  $$(pwd)/.cache
 
-test:
-	echo -n "Restart qgis" > .qgis-restart
-	docker run --rm --name qgis-py-server-test-$(COMMITID) -w /src \
-		-v $(SRCDIR):/src \
-		-e QGSRV_TEST_PROTOCOL=/src/tests/data \
-		-e QGSRV_CONTRIB_PROFILES_CONFIG=/src/tests/profiles.yml \
-		-e QGSRV_CONTRIB_PROFILES_WITH_REFERER=yes \
-		-e QGSRV_SERVER_RESTARTMON=/src/.qgis-restart \
-		-e QGSRV_CACHE_ROOTDIR=/src/tests/data \
-		-e QGSRV_SERVER_HTTP_PROXY=yes \
-		-e QGIS_OPTIONS_PATH=/src/tests/qgis \
-		-e QGSRV_LOGGING_LEVEL=DEBUG \
-		-e QGSRV_SERVER_STATUS_PAGE=yes \
-		-e QGSRV_MANAGEMENT_ENABLED=yes \
-		-e QGSRV_MANAGEMENT_INTERFACES=0.0.0.0 \
-		-e QGSRV_API_ENABLED_LANDING_PAGE=yes \
-		-e PYTEST_ADDOPTS="$(PYTEST_ADDOPTS)" \
-		-e BECOME_USER=$(BECOME_USER) \
-		--entrypoint $(SCRIPTS)/run_tests.sh \
-		$(QGIS_IMAGE)
+_clean:
+	rm -rf $$(pwd)/.local $$(pwd)/.cache
 
+clean: _clean env
 
 WORKERS:=1
-
-run:
-	echo -n "Restart qgis" > .qgis-restart
-	docker run -it --rm -p $(SERVER_HTTP_PORT):8080 \
-		-p $(SERVER_MANAGMENT_PORT):19876 \
-		--name qgis-py-server-run-$(COMMITID) -w /src \
-		-v $(SRCDIR):/src \
-		-v $$(pwd)/server.conf:/server.conf \
-		-e QGSRV_SERVER_WORKERS=$(WORKERS) \
-		-e QGSRV_CACHE_ROOTDIR=/src/tests/data \
-		-e QGSRV_TEST_PROTOCOL=/src/tests/data \
-		-e QGSRV_CONTRIB_PROFILES_CONFIG=/src/tests/profiles.yml \
-		-e QGSRV_CONTRIB_PROFILES_WITH_REFERER=yes \
-		-e QGSRV_SERVER_RESTARTMON=/src/.qgis-restart \
-		-e QGSRV_SERVER_HTTP_PROXY=yes \
-		-e QGSRV_LOGGING_LEVEL=DEBUG \
-		-e PYTHONWARNINGS=d \
-		-e QGIS_OPTIONS_PATH=/src/tests/qgis \
-		-e QGSRV_DATA_PATH=/.local/share/qgis-server \
-		-e QGSRV_SERVER_STATUS_PAGE=yes \
-		-e QGSRV_MANAGEMENT_ENABLED=yes \
-		-e QGSRV_MANAGEMENT_INTERFACES=0.0.0.0 \
-		-e QGSRV_API_ENABLED_LANDING_PAGE=yes \
-		-e BECOME_USER=$(BECOME_USER) \
-		--entrypoint $(SCRIPTS)/run_server.sh \
-		$(QGIS_IMAGE)
+PROJECTPATH:=$(SRCDIR)/tests/data
 
 
-QGIS_WPSIMAGE=$(REGISTRY_PREFIX)qgis-wps:$(FLAVOR)
+env: local
+	@echo "Creating environment file for docker-compose"
+	@[ ! -d "$(SERVER_SRC)" ] && echo "[ERROR] 'SERVER_SRC' not defined" && exit 1
+	@cat <<-EOF > .env
+		SERVER_SRC=$(SERVER_SRC)
+		WPS_SERVER_SRC=$(WPS_SERVER_SRC)
+		SRCDIR=$(SRCDIR)
+		WORKERS=$(WORKERS)
+		BECOME_USER=$(BECOME_USER)
+		QGIS_IMAGE=$(QGIS_IMAGE)
+		USER=$(USER)
+		PWD=$(shell pwd)
+		PLUGINPATH=$(PLUGINPATH)
+		PROJECTPATH=$(PROJECTPATH)
+		SERVER_HTTP_PORT=$(SERVER_HTTP_PORT)
+		MANAGEMENT_HTTP_PORT=$(MANAGEMENT_HTTP_PORT)
+		PYTEST_ADDOPTS=$(PYTEST_ADDOPTS)
+		COMPOSE_PROJECT_NAME=test-pyqgisserver-profile
+		EOF
 
-wpstest: local
-	docker run --rm --name qgis-wps-test-$(FLAVOR)-$(COMMITID) -w /src \
-		-u $(BECOME_USER) \
-		-v $(SRCDIR):/src \
-		-v $$(pwd)/.local:/.local \
-		-v $(LOCAL_HOME)/.cache:/.cache \
-		-e PIP_CACHE_DIR=/.cache \
-		-e QGSWPS_SERVER_PROFILES=/src/tests/profiles.yml \
-		-e PYTEST_ADDOPTS="$(PYTEST_ADDOPTS)" \
-		-e QGSWPS_CACHE_ROOTDIR=/src/tests/data \
-		-e QGSWPS_PROCESSING_PROVIDERS_MODULE_PATH=/src/tests/wpstests \
-		-e QGSWPS_SERVER_HTTP_PROXY=yes \
-		-e QGIS_OPTIONS_PATH=/src/tests/qgis \
-		--entrypoint $(SCRIPTS)/run-wps-tests.sh \
-		$(QGIS_WPSIMAGE)
 
-wpsrun: local
-	docker run --rm --name qgis-wps-test-$(FLAVOR)-$(COMMITID) -w /src \
-		-u $(BECOME_USER) \
-		-v $(SRCDIR):/src \
-		-v $$(pwd)/.local:/.local \
-		-v $(LOCAL_HOME)/.cache:/.cache \
-		-e PIP_CACHE_DIR=/.cache \
-		-e WORKERS=$(WORKERS) \
-		-e QYWPS_SERVER_PROFILES=/src/tests/profiles.yml \
-		-e PYTEST_ADDOPTS="$(PYTEST_ADDOPTS)" \
-		-e QGSWPS_CACHE_ROOTDIR=/src/tests/data \
-		-e QGSWPS_PROCESSING_PROVIDERS_MODULE_PATH=/src/tests/wpstests \
-		-e QGSWPS_SERVER_HTTP_PROXY=yes \
-		-e QGIS_OPTIONS_PATH=/src/tests/qgis \
-		-e QGSWPS_LOGLEVEL=DEBUG \
-		--entrypoint $(SCRIPTS)/run-wps-server.sh \
-		$(QGIS_WPSIMAGE)
+%-up: env
+	docker compose \
+	-f docker-compose.$*.yml up -V --quiet-pull --remove-orphans \
+		--force-recreate --exit-code-from qgis-server
+
+stop:
+	docker compose down -v --remove-orphans
+
+test-ows: export RUN_COMMAND=$(SCRIPTS)/run-ows-tests.sh
+test-ows: ows-up
+
+test-wps: export RUN_COMMAND=$(SCRIPTS)/run-wps-tests.sh
+test-wps: wps-up
 
 

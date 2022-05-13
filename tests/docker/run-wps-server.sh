@@ -2,23 +2,38 @@
 
 set -e
 
-# Add /.local to path
-export PATH=$PATH:/.local/bin
-
 echo "-- HOME is $HOME"
 
-echo "Installing python package, please wait...."
+VENV_PATH=/.local/venv
 
-pip3 install -U -q --user setuptools fakeredis
-pip3 install --no-warn-script-location -q --user --prefer-binary -r requirements.txt 
-pip3 install --user -e ./ 
+PIP="$VENV_PATH/bin/pip"
+PIP_INSTALL="$VENV_PATH/bin/pip install -U"
+
+echo "-- Creating virtualenv"
+python3 -m venv --system-site-packages $VENV_PATH
+
+if [ ! -d /server_src ]; then
+    echo "Cannot install server"
+    exit 1
+fi
+
+echo "-- Installing server..."
+$PIP_INSTALL -q -e /server_src/
+
+echo "-- Installing required packages..."
+$PIP_INSTALL -q pip setuptools
+$PIP_INSTALL -q --prefer-binary -r requirements.tests
+$PIP_INSTALL -q --prefer-binary -r requirements.txt
+
+$PIP_INSTALL -q -e ./
 
 export QGIS_DISABLE_MESSAGE_HOOKS=1
 export QGIS_NO_OVERRIDE_IMPORT=1
 
-export FAKEREDIS=yes
+# Disable qDebug stuff that bloats test outputs
+export QT_LOGGING_RULES="*.debug=false;*.warning=false"
 
 # Run new tests
 cd tests/wpstests
-exec wpsserver -w $WORKERS -p 8080
+exec $VENV_PATH/bin/wpsserver -p 8080
 

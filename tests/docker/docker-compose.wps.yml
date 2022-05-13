@@ -1,0 +1,32 @@
+version: '3.8'
+services:
+  qgis-server:
+    image: ${QGIS_IMAGE}
+    working_dir: /src
+    command: ${RUN_COMMAND}
+    environment:
+      PYTHONWARNINGS: 'd'
+      PIP_CACHE_DIR: /.cache
+      USER: ${USER}
+      WORKERS: ${WORKERS}
+      QGSRV_CONTRIB_PROFILES_CONFIG: 
+      QGSWPS_CACHE_ROOTDIR: /src/tests/data 
+      QGSWPS_PROCESSING_PROVIDERS_MODULE_PATH: /src/tests/wpstests
+      QGSWPS_SERVER_WORKDIR: /srv/data
+      QGSWPS_SERVER_RESTARTMON: /src/.qgis-restart
+      QGSWPS_LOGLEVEL: DEBUG
+      QGSWPS_REDIS_HOST: redis
+      QGIS_OPTIONS_PATH: /src/tests/qgis
+      PYTEST_ADDOPTS: ${PYTEST_ADDOPTS}
+    user: "${BECOME_USER}"
+    volumes:
+      - ${WPS_SERVER_SRC}:/server_src
+      - ${SRCDIR}:/src
+      - ${PWD}/.local:/.local
+      - ${PWD}/.cache:/.cache
+      - ${PWD}/__workdir__:/srv/data
+    ports:
+      - ${SERVER_HTTP_PORT}:8080
+  redis:
+     image: redis:6-alpine
+

@@ -74,7 +74,7 @@ class Tests(HTTPTestCase):
         urlref = urlparse(uri)
 
         href = urlparse(elem[0].get(xlink+'href'))
-        assert href.path == urlref.path.rstrip('/')
+        assert href.path == urlref.path
 
 
     def test_map_only_ok(self):

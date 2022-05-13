@@ -6,27 +6,10 @@ import logging
 from pyqgisserver.tests import TestRuntime
 from time import sleep
 
-def pytest_addoption(parser):
-    parser.addoption("--server-debug", action="store_true", help="Set debug mode",
-                     default=False)
-
-
-server_debug = False
-
-
-def pytest_configure(config):
-    global server_debug
-    server_debug = config.getoption('server_debug')
-
 
 def pytest_sessionstart(session):
     """ Start subprocesses
     """
-    logging.basicConfig( stream=sys.stderr, level=logging.DEBUG )
-
-    if not server_debug:
-        logging.disable(logging.WARNING)
-
     rt = TestRuntime.instance()
     rt.start()
     print("Waiting for server to initialize...")

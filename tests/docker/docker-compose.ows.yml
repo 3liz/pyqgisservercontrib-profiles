@@ -1,0 +1,40 @@
+version: '3.8'
+services:
+    qgis-server:
+        image: ${QGIS_IMAGE}
+        working_dir: /src
+        command: ${RUN_COMMAND}
+        environment:
+            PYTHONWARNINGS: 'd'
+            PIP_CACHE_DIR: /.cache
+            USER: ${USER}
+            QGSRV_CONTRIB_PROFILES_CONFIG: /src/tests/profiles.yml
+            QGSRV_CONTRIB_PROFILES_WITH_REFERER: 'yes'
+            QGIS_OPTIONS_PATH: /src/tests/qgis
+            QGIS_SERVER_TRUST_LAYER_METADATA: 'yes'
+            QGSRV_SERVER_WORKERS: ${WORKERS}
+            QGSRV_CACHE_ROOTDIR: /src/tests/data
+            QGSRV_SERVER_PLUGINPATH: /plugins
+            QGSRV_PROJECTS_SCHEMES_TEST:  /src/tests/data/
+            QGSRV_SERVER_RESTARTMON: /src/.qgis-restart
+            QGSRV_SERVER_HTTP_PROXY: 'yes'
+            QGSRV_LOGGING_LEVEL: DEBUG
+            QGSRV_SERVER_STATUS_PAGE: 'yes'
+            QGSRV_MANAGEMENT_ENABLED: 'yes'
+            QGSRV_MANAGEMENT_INTERFACES: '0.0.0.0'
+            QGSRV_API_ENABLED_LANDING_PAGE: 'yes'
+            QGSRV_SERVER_ENABLE_FILTERS: 'yes'
+            PYTEST_ADDOPTS: ${PYTEST_ADDOPTS}
+        user: ${BECOME_USER}
+        volumes:
+            - ${SERVER_SRC}:/server_src
+            - ${SRCDIR}:/src
+            - ${PWD}/.local:/.local
+            - ${PWD}/.cache:/.cache
+            - ${PWD}/server.conf:/server.conf
+            - ${PLUGINPATH}:/plugins
+            - ${PROJECTPATH}:/src/tests/data
+        ports:
+            - ${SERVER_HTTP_PORT}:8080
+            - ${MANAGEMENT_HTTP_PORT}:19876
+

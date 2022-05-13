@@ -50,5 +50,8 @@ lint:
 	@flake8 pyqgisservercontrib
 
 test: lint
-	$(MAKE) -C tests/docker test FLAVOR=$(FLAVOR)
+	$(MAKE) -C tests/docker test-ows FLAVOR=$(FLAVOR)
+
+test-wps: lint
+	$(MAKE) -C tests/docker test-wps FLAVOR=$(FLAVOR)
 

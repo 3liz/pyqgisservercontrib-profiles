@@ -30,23 +30,24 @@ import traceback
 import jsonschema
 import re
 
-from tornado.web import HTTPError, RequestHandler
+from tornado.web import HTTPError
 
 from yaml.nodes import SequenceNode
 
-from typing import Mapping, TypeVar, Any, Optional
+from typing import Mapping, TypeVar, Any, Optional, Dict, List
 
 from ipaddress import ip_address, ip_network
 from glob import glob 
 from pathlib import Path
 
 from pyqgisservercontrib.core.watchfiles import watchfiles
-from pyqgisservercontrib.core.filters import blockingfilter
+from pyqgisservercontrib.core.filters import policy_filter
 
 LOGGER = logging.getLogger('SRVLOG.profiles')
 
 # Define an abstract type for HTTPRequest
 HTTPRequest = TypeVar('HTTPRequest')
+
 #
 # Schema for profiles
 #
@@ -189,13 +190,16 @@ class ProfileError(Exception):
     """ Raised when profil does not match
     """
 
-def output_debug_profile(name, p):
+def output_debug_profile(name, p, endpoint):
+    import json
     LOGGER.debug((f"===== Checking matching profile <{name}>:\n"
                   f"* services: {p._services}\n"
                   f"* parameters: {p._parameters}\n"
                   f"* allowed ips: {p._allowed_ips}\n"
                   f"* allowed referers: {p._allowed_referers}\n"
                   f"* access policy: {p._accesspolicy}\n"
+                  f"* proxy urls: {json.dumps(p._urls, indent=2)}\n"
+                  f"* endpoint: {endpoint}\n"
                   )),
 
 REGEXP_PREFIX="@RE:"
@@ -216,6 +220,8 @@ class _Profile:
         self._allowed_ips = [ip_network(ip) for ip in data.get('allowed_ips',[])]
         self._accesspolicy = data.get('accesspolicy') if wpspolicy else None
 
+        self._arguments = {}
+
         # Urls have two different forms, use one
         def _url2dict( item ):
             if isinstance(item, str):
@@ -229,10 +235,10 @@ class _Profile:
         # 'only' directive
         self._mapfilters  = _to_list(data.get('only',{}).get('map',[]))
 
-    def get_service(self, request: HTTPRequest, endpoint: Optional[str] = None) -> str:
+    def get_service(self, endpoint: Optional[str] = None) -> str:
         """ Return  request service
         """
-        service = request.arguments.get('SERVICE')
+        service = self._arguments.get('SERVICE')
         if service:
             service = service[-1]
             if isinstance(service,bytes):
@@ -286,14 +292,14 @@ class _Profile:
         if not any( (ip in _ips) for _ips in self._allowed_ips ):
             raise ProfileError("Rejected ip %s" % ip)
 
-    def test_only( self, request: HTTPRequest ) -> None:
+    def test_only(self) -> None:
         """ Test 'only' directive
         """
         maps = self._mapfilters
         if not maps:
             return
 
-        test = request.arguments.get('MAP')
+        test = self._arguments.get('MAP')
         if not test:
             return
 
@@ -304,37 +310,39 @@ class _Profile:
         if not any( test.match(m) for m in maps ):
             raise ProfileError("Rejected MAP: %s" % test)
 
-    def test_urls( self, request: HTTPRequest, service: str ) -> None:
+    def test_urls( self, request: HTTPRequest, service: str, endpoint: str ) -> None:
         """ Override 'X-Forwarded-Url' header
         """
         # Retrieve url associated to the service
         # and override the 'X-Forwarded-Url' header
         url = self._urls.get(service)
         if url:
-            request.headers['X-Forwarded-Url'] = url['url']
+            request.headers['X-Forwarded-Url'] = f"{url['url'].strip('/')}{endpoint}"
             # Supported in Qgis 3.20+, replace the complete url (query params included...)
             # As 3.20.3 does not work with WFS3
             if url['serviceURL']:
                 request.headers['X-Qgis-Service-Url'] = url['url']
-        else:
-            request.headers['X-Forwarded-Url'] = f"{request.protocol}://{request.host}/ows/p/{self._name}"
+        # Do not change url for default profile
+        elif self._name != 'default':
+            request.headers['X-Forwarded-Url'] = f"{request.protocol}://{request.host}/ows/p/{self._name}{endpoint}"
 
-    def apply(self, handler: RequestHandler, http_proxy: bool, with_referer: bool=False) -> None:
+    def apply(self, request: HTTPRequest, endpoint: str, http_proxy: bool, with_referer: bool=False) -> Optional[Dict]:
         """ Apply profiles constraints
         """
-        request = handler.request
         request.arguments.update((k,[v.encode()]) for k,v in  self._parameters.items())
-        
-        service = self.get_service(request, handler.path_kwargs.get('endpoint'))
+       
+        self._arguments = {k.upper(): v for k, v in request.arguments.items()} 
+
+        service = self.get_service(endpoint)
         self.test_services(request, service)
-        self.test_urls(request, service)
+        self.test_urls(request, service, endpoint)
         if with_referer:
             self.test_allowed_referers_or_ips(request, http_proxy)
         else:
             self.test_allowed_ips(request, http_proxy)
-        self.test_only(request)
+        self.test_only()
         if self._accesspolicy:
-            handler.accesspolicy.add_policy(**_kwargs(self._accesspolicy,'deny','allow'))
+            return _kwargs(self._accesspolicy,'deny','allow')
 
 
 class ProfileMngr:
@@ -396,8 +404,9 @@ class ProfileMngr:
             LOGGER.info("Disabling profiles autoreload")
             self._autoreload.stop()            
 
-    def apply_profile( self, name: str, handler: RequestHandler, 
-                       http_proxy: bool=False, with_referer: bool=False) -> bool:
+    def apply_profile( self, name: str, endpoint: str, request: HTTPRequest, 
+                       http_proxy: bool, with_referer: bool,
+                       wps_policies: List) -> bool:
         """ Check profile condition
         """
         try:
@@ -409,10 +418,13 @@ class ProfileMngr:
                 raise ProfileError("Unknown profile")
             # Apply global access policy
             if self._accesspolicy: 
-                handler.accesspolicy.add_policy(**_kwargs(self._accesspolicy,'deny','allow'))
+                wps_policies.append(_kwargs(self._accesspolicy, 'deny', 'allow'))
             # Apply filter
-            output_debug_profile(name,profile)
-            profile.apply(handler, http_proxy, with_referer=with_referer)
+            output_debug_profile(name, profile, endpoint)
+            wps_policy = profile.apply(request, endpoint, http_proxy, with_referer=with_referer)
+            if wps_policy:
+                wps_policies.append(wps_policy)
+
             return True
         except ProfileError as err:
             LOGGER.error("Invalid profile '%s': %s", name or "<default>", err)
@@ -420,7 +432,7 @@ class ProfileMngr:
         return False
 
 
-def register_policy( collection, wpspolicy=False ) -> None:
+def register_policy(policy_service, wpspolicy: bool=False) -> None:
     """ Register filters
     """
     from  pyqgisservercontrib.core import componentmanager
@@ -433,24 +445,31 @@ def register_policy( collection, wpspolicy=False ) -> None:
         configservice.get('contrib:profiles' , 'config', fallback=None)
 
     if with_profiles:
-        http_proxy = configservice.getboolean('server','http_proxy',False)
+        http_proxy = configservice.getboolean('server', 'http_proxy', False)
         mngr = ProfileMngr.initialize(with_profiles, wpspolicy=wpspolicy)
 
         with_referer = configservice.getboolean('contrib:profiles','with_referer',fallback=False)
 
-        @blockingfilter()
-        def default_filter( handler: RequestHandler ) -> None:
-            if not mngr.apply_profile('default', handler, http_proxy, with_referer=with_referer):
+        @policy_filter()
+        def default_filter(request: HTTPRequest) -> None:
+            wps_policies = []
+            if not mngr.apply_profile('default', "/", request, http_proxy, with_referer=with_referer,
+                                      wps_policies=wps_policies):
                 raise HTTPError(403,reason="Unauthorized profile")
+            return wps_policies 
 
-        @blockingfilter(pri=-1000, uri=r"p/(?P<profile>(?:(?!/wfs3/?).)*)")
-        def profile_filter( handler: RequestHandler ) -> str:
-            # Remove profile from argument list
-            profile = handler.path_kwargs.pop('profile')
-            if not mngr.apply_profile(profile, handler, http_proxy, with_referer=with_referer):
+        @policy_filter(match=r"/ows/p/(?P<profile>(?:(?!/wfs3/?).)*)(?P<endpoint>/.*)?", repl=r"/ows\2")
+        def profile_filter(request: HTTPRequest, profile: str, endpoint: Optional[str]=None ) -> str:
+            wps_policies = []
+            if not mngr.apply_profile(profile, endpoint or "/", request, http_proxy, with_referer=with_referer,
+                                      wps_policies=wps_policies):
                 raise HTTPError(403,reason="Unauthorized profile")
-            # Keep this for compatibility with access_policy_version < 2
-            return f"p/{profile}"
+            return wps_policies 
 
-        collection.extend([profile_filter, default_filter])
+        policy_service.add_filters([profile_filter, default_filter], pri=1000)
+
+
+def register_wps_policy(policy_service) -> None:
+    register_policy(policy_service, wpspolicy=True)
+
 
