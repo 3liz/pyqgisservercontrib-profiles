@@ -7,15 +7,6 @@ from pathlib import Path
 
 from pyqgiswps.tests import TestRuntime
 
-def pytest_addoption(parser):
-    parser.addoption("--server-debug", action='store_true', help="set debug mode")
-
-server_debug = False
-
-def pytest_configure(config):
-    global server_debug
-    server_debug = config.getoption('server_debug')
-
 
 @pytest.fixture(scope='session')
 def outputdir(request):
@@ -30,11 +21,6 @@ def data(request):
 
 
 def pytest_sessionstart(session):
-
-    logging.basicConfig(  stream=sys.stderr, level=logging.DEBUG)
-    
-    if not server_debug:
-        logging.disable(logging.ERROR)
 
     rt = TestRuntime.instance()
     rt.start()

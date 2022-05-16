@@ -348,13 +348,16 @@ class _Profile:
 class ProfileMngr:
     
     @classmethod
-    def initialize( cls, profiles: str, exit_on_error: bool=True, wpspolicy: bool=False ) -> 'ProfileMngr':
+    def initialize( cls, profiles: str, exit_on_error: bool=True, wpspolicy: bool=False,
+                    with_referer: bool=False,
+                    http_proxy: bool=False) -> 'ProfileMngr':
         """ Create Profile manager
 
             param Profiles: path to profile configuration
         """
         try:
-            mngr = ProfileMngr(wpspolicy=wpspolicy)
+            mngr = ProfileMngr(wpspolicy=wpspolicy, with_referer=with_referer,
+                               http_proxy=http_proxy)
             mngr.load(profiles)
             return mngr
         except Exception:
@@ -365,15 +368,18 @@ class ProfileMngr:
             else:
                 raise
 
-    def __init__(self, wpspolicy: bool=False) -> None:
+    def __init__(self, wpspolicy: bool=False, with_referer: bool=False,
+                 http_proxy: bool=False ) -> None:
         self._autoreload = None
         self._wpspolicy  = wpspolicy
+        self._with_referer = with_referer
+        self._http_proxy = http_proxy
 
     def load( self, profiles: str) -> None:
         """ Load profile configuration
         """
         wps = self._wpspolicy
-        LOGGER.info("Reading profiles %s",profiles)
+        LOGGER.info("Reading profiles %s (wps policy: %s)",profiles, wps)
         with open(profiles,'r') as f:
             config = yaml.load(f, Loader=Loader)
             # Validate configuration
@@ -405,8 +411,7 @@ class ProfileMngr:
             self._autoreload.stop()            
 
     def apply_profile( self, name: str, endpoint: str, request: HTTPRequest, 
-                       http_proxy: bool, with_referer: bool,
-                       wps_policies: List) -> bool:
+                       wps_policies: Optional[List]=None) -> bool:
         """ Check profile condition
         """
         try:
@@ -421,7 +426,8 @@ class ProfileMngr:
                 wps_policies.append(_kwargs(self._accesspolicy, 'deny', 'allow'))
             # Apply filter
             output_debug_profile(name, profile, endpoint)
-            wps_policy = profile.apply(request, endpoint, http_proxy, with_referer=with_referer)
+            wps_policy = profile.apply(request, endpoint, self._http_proxy, 
+                                       with_referer=self._with_referer)
             if wps_policy:
                 wps_policies.append(wps_policy)
 
@@ -432,9 +438,7 @@ class ProfileMngr:
         return False
 
 
-def register_policy(policy_service, wpspolicy: bool=False) -> None:
-    """ Register filters
-    """
+def initialize_profiles(wpspolicy: bool) -> ProfileMngr:
     from  pyqgisservercontrib.core import componentmanager
     configservice  = componentmanager.get_service('@3liz.org/config-service;1')
   
@@ -446,30 +450,61 @@ def register_policy(policy_service, wpspolicy: bool=False) -> None:
 
     if with_profiles:
         http_proxy = configservice.getboolean('server', 'http_proxy', False)
-        mngr = ProfileMngr.initialize(with_profiles, wpspolicy=wpspolicy)
 
         with_referer = configservice.getboolean('contrib:profiles','with_referer',fallback=False)
+        with_referer = configservice.getboolean('contrib:profiles','with_referer',fallback=False)
 
-        @policy_filter()
-        def default_filter(request: HTTPRequest) -> None:
-            wps_policies = []
-            if not mngr.apply_profile('default', "/", request, http_proxy, with_referer=with_referer,
-                                      wps_policies=wps_policies):
-                raise HTTPError(403,reason="Unauthorized profile")
-            return wps_policies 
+        mngr = ProfileMngr.initialize(with_profiles, 
+                                      wpspolicy=wpspolicy, 
+                                      with_referer=with_referer,
+                                      http_proxy=http_proxy)
 
-        @policy_filter(match=r"/ows/p/(?P<profile>(?:(?!/wfs3/?).)*)(?P<endpoint>/.*)?", repl=r"/ows\2")
-        def profile_filter(request: HTTPRequest, profile: str, endpoint: Optional[str]=None ) -> str:
-            wps_policies = []
-            if not mngr.apply_profile(profile, endpoint or "/", request, http_proxy, with_referer=with_referer,
-                                      wps_policies=wps_policies):
-                raise HTTPError(403,reason="Unauthorized profile")
-            return wps_policies 
-
-        policy_service.add_filters([profile_filter, default_filter], pri=1000)
+        return mngr
+                
+    return None
 
 
-def register_wps_policy(policy_service) -> None:
-    register_policy(policy_service, wpspolicy=True)
+def register_policy(policy_service, *args, **kwargs) -> None:
+    """ Register filters
+    """
+    mngr = initialize_profiles(wpspolicy=False)
+    if not mngr:
+        return
+    
+    @policy_filter()
+    def default_filter(request: HTTPRequest) -> None:
+        if not mngr.apply_profile('default', "/", request):
+            raise HTTPError(403,reason="Unauthorized profile")
+
+    @policy_filter(match=r"/ows/p/(?P<profile>(?:(?!/wfs3/?).)*)(?P<endpoint>/.*)?", repl=r"/ows\2")
+    def profile_filter(request: HTTPRequest, profile: str, endpoint: Optional[str]=None ) -> List[Dict]:
+        if not mngr.apply_profile(profile, endpoint or "/", request):
+            raise HTTPError(403,reason="Unauthorized profile")
+
+    policy_service.add_filters([profile_filter, default_filter], pri=1000)
+
+
+def register_wps_policy(policy_service, *args, **kwargs) -> None:
+    """ Entry for WPS service
+    """
+    mngr = initialize_profiles(wpspolicy=True)
+    if not mngr:
+        return
+ 
+    @policy_filter()
+    def default_filter(request: HTTPRequest) -> List[Dict]:
+        wps_policies = []
+        if not mngr.apply_profile('default', "/", request, wps_policies=wps_policies):
+            raise HTTPError(403,reason="Unauthorized profile")
+        return wps_policies 
+
+    @policy_filter(match=r"/ows/p/(?P<profile>.*)", repl=r"/ows/")
+    def profile_filter(request: HTTPRequest, profile: str) -> List[Dict]:
+        wps_policies = []
+        if not mngr.apply_profile(profile, "/", request, wps_policies=wps_policies):
+            raise HTTPError(403,reason="Unauthorized profile")
+        return wps_policies 
+
+    policy_service.add_filters([profile_filter, default_filter], pri=1000)
 
 

@@ -4,7 +4,13 @@
 from pyqgiswps.tests import HTTPTestCase
 from pyqgiswps.executors.processingexecutor import ProcessingExecutor
 
+from pyqgiswps.executors.processfactory import get_process_factory
+
+
 class Tests(HTTPTestCase):
+
+    def get_processes(self):
+        return get_process_factory()._create_qgis_processes()
 
     def test_profile_request(self):
         """ Test response from root path

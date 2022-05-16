@@ -9,8 +9,6 @@ VENV_PATH=/.local/venv
 PIP="$VENV_PATH/bin/pip"
 PIP_INSTALL="$VENV_PATH/bin/pip install -U"
 
-ls -al /server_src/
-
 echo "-- Creating virtualenv"
 python3 -m venv --system-site-packages $VENV_PATH
 
@@ -34,6 +32,9 @@ export QGIS_NO_OVERRIDE_IMPORT=1
 
 # Disable qDebug stuff that bloats test outputs
 export QT_LOGGING_RULES="*.debug=false;*.warning=false"
+
+# Do no restart workers on each run
+export QGSWPS_SERVER_PROCESSLIFECYCLE=0
 
 # Run tests
 cd tests/wpstests && $VENV_PATH/bin/pytest -v $@

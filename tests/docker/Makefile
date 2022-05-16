@@ -25,10 +25,10 @@ PLUGINPATH:=$(SRCDIR)/tests/plugins
 SCRIPTS=./tests/docker
 
 local:
-	mkdir -p $$(pwd)/.local  $$(pwd)/.cache
+	mkdir -p $$(pwd)/.local  $$(pwd)/.cache $$(pwd)/.workdir
 
 _clean:
-	rm -rf $$(pwd)/.local $$(pwd)/.cache
+	rm -rf $$(pwd)/.local $$(pwd)/.cache $$(pwd)/.workdir
 
 clean: _clean env
 
@@ -70,5 +70,8 @@ test-ows: ows-up
 
 test-wps: export RUN_COMMAND=$(SCRIPTS)/run-wps-tests.sh
 test-wps: wps-up
+
+run-wps: export RUN_COMMAND=$(SCRIPTS)/run-wps-server.sh
+run-wps: wps-up
 
 
