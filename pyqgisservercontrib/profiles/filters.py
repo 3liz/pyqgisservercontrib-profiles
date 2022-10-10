@@ -499,7 +499,11 @@ def register_wps_policy(policy_service, *args, **kwargs) -> None:
         return wps_policies 
 
     @policy_filter(match=r"/store/([^/]+)/(.+)", repl=r"/jobs/\1/files/\2")
-    def store_filter(request: HTTPRequest, uuid: str, resource: str) -> List[Dict]:
+    def store_filter_1(request: HTTPRequest, uuid: str, resource: str) -> List[Dict]:
+        return []
+
+    @policy_filter(match=r"/jobs/([^/]+)/files/(.+)")
+    def store_filter_2(request: HTTPRequest, uuid: str, resource: str) -> List[Dict]:
         return []
 
     @policy_filter(match=r"/ows/p/(?P<profile>.*)", repl=r"/ows/")
@@ -509,7 +513,12 @@ def register_wps_policy(policy_service, *args, **kwargs) -> None:
             raise HTTPError(403,reason="Unauthorized profile")
         return wps_policies 
 
-    policy_service.add_filters([profile_filter, store_filter, default_filter], pri=1000)
+    policy_service.add_filters([
+        profile_filter, 
+        store_filter_1,
+        store_filter_2,
+        default_filter
+    ], pri=1000)
 
 
 
