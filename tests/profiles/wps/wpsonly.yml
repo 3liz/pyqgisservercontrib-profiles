@@ -30,3 +30,14 @@ withpolicy:
     allow: 
       - "pyqgiswps_test:testsimplevalue"
 
+withurl:
+  services:
+    - WPS
+  urls:
+    WPS: 'https://test.whatever.com/qgis-server-wps/ows/p/withurl'
+  parameters:
+    MAP: france_parts.qgs
+  accesspolicy:
+    allow: all
+
+

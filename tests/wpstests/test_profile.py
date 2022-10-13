@@ -1,6 +1,8 @@
 """
     Test profiles
 """
+from urllib.parse import urlparse
+
 from pyqgiswps.tests import HTTPTestCase
 from pyqgiswps.executors.processingexecutor import ProcessingExecutor
 
@@ -64,4 +66,27 @@ class Tests(HTTPTestCase):
         assert idents == ['pyqgiswps_test:testsimplevalue']
 
 
+    def test_service_url(self):
+        """ Test access policy
+        """
+        uri = ('/ows/p/withurl/?service=WPS&request=Execute&Identifier=pyqgiswps_test:testcopylayer&Version=1.0.0'
+                               '&DATAINPUTS=INPUT=france_parts%3BOUTPUT=france_parts_2')
+        rv = self.client.get(uri, path='')
+        assert rv.status_code == 200
+
+        node = rv.xpath('/wps:ExecuteResponse')[0]
+
+        serviceInstance = node.attrib['serviceInstance']
+        assert serviceInstance is not None
+        serviceInstance = urlparse(serviceInstance)
+        assert serviceInstance.scheme == "https"
+        assert serviceInstance.netloc == "test.whatever.com"
+        assert serviceInstance.path == "/qgis-server-wps/ows/p/withurl"
+
+        statusLocation = node.attrib['statusLocation']
+        assert statusLocation is not None
+        statusLocation = urlparse(statusLocation)
+        assert statusLocation.scheme == "https"
+        assert statusLocation.netloc == "test.whatever.com"
+        assert statusLocation.path == "/qgis-server-wps/ows/p/withurl"
 
