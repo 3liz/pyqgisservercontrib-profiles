@@ -521,7 +521,7 @@ def register_wps_policy(policy_service, *args, **kwargs) -> None:
     @policy_filter(match=r"/ows/p/(?P<profile>.*)", repl=r"/ows/")
     def profile_filter_ows(request: HTTPRequest, profile: str) -> List[Dict]:
         wps_policies = []
-        if not mngr.apply_profile(profile, "/", request, wps_policies=wps_policies):
+        if not mngr.apply_profile(profile, request, wps_policies=wps_policies):
             raise HTTPError(403, reason="Unauthorized profile")
         return wps_policies 
 
