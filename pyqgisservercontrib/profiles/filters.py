@@ -511,11 +511,11 @@ def register_wps_policy(policy_service, *args, **kwargs) -> None:
         return wps_policies 
 
     @policy_filter(match=r"/store/([^/]+)/(.+)", repl=r"/jobs/\1/files/\2")
-    def store_filter_1(request: HTTPRequest, uuid: str, resource: str) -> List[Dict]:
+    def store_filter(request: HTTPRequest, *args, **kwargs) -> List[Dict]:
         return []
 
-    @policy_filter(match=r"/jobs/([^/]+)/files/(.+)")
-    def store_filter_2(request: HTTPRequest, uuid: str, resource: str) -> List[Dict]:
+    @policy_filter(match=r"/ows/p/(?P<profile>.*)/jobs/([^/]+)/files/(.+)", repl=r"/jobs/\2/files/\3")
+    def jobs_filter(request: HTTPRequest, *arg, **kwargs) -> List[Dict]:
         return []
 
     @policy_filter(match=r"/ows/p/(?P<profile>.*)", repl=r"/ows/")
@@ -526,9 +526,9 @@ def register_wps_policy(policy_service, *args, **kwargs) -> None:
         return wps_policies 
 
     policy_service.add_filters([
+        store_filter,
+        jobs_filter,
         profile_filter_ows, 
-        store_filter_1,
-        store_filter_2,
         default_filter,
     ], pri=1000)
 
