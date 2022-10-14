@@ -38,10 +38,7 @@ PROJECTPATH:=$(SRCDIR)/tests/data
 
 env: local
 	@echo "Creating environment file for docker-compose"
-	@[ ! -d "$(SERVER_SRC)" ] && echo "[ERROR] 'SERVER_SRC' not defined" && exit 1
 	@cat <<-EOF > .env
-		SERVER_SRC=$(SERVER_SRC)
-		WPS_SERVER_SRC=$(SERVER_SRC)
 		SRCDIR=$(SRCDIR)
 		WORKERS=$(WORKERS)
 		BECOME_USER=$(BECOME_USER)
@@ -70,6 +67,9 @@ test-ows: ows-up
 
 test-wps: export RUN_COMMAND=$(SCRIPTS)/run-wps-tests.sh
 test-wps: wps-up
+
+run-ows: export RUN_COMMAND=$(SCRIPTS)/run-ows-server.sh
+run-ows: ows-up
 
 run-wps: export RUN_COMMAND=$(SCRIPTS)/run-wps-server.sh
 run-wps: wps-up

@@ -190,7 +190,7 @@ class ProfileError(Exception):
     """ Raised when profil does not match
     """
 
-def output_debug_profile(name, p, endpoint):
+def output_debug_profile(name, p):
     import json
     LOGGER.debug((f"===== Checking matching profile <{name}>:\n"
                   f"* services: {p._services}\n"
@@ -199,7 +199,6 @@ def output_debug_profile(name, p, endpoint):
                   f"* allowed referers: {p._allowed_referers}\n"
                   f"* access policy: {p._accesspolicy}\n"
                   f"* proxy urls: {json.dumps(p._urls, indent=2)}\n"
-                  f"* endpoint: {endpoint}\n"
                   )),
 
 REGEXP_PREFIX="@RE:"
@@ -235,7 +234,7 @@ class _Profile:
         # 'only' directive
         self._mapfilters  = _to_list(data.get('only',{}).get('map',[]))
 
-    def get_service(self, endpoint: Optional[str] = None) -> str:
+    def get_service(self, default: Optional[str]=None) -> str:
         """ Return  request service
         """
         service = self._arguments.get('SERVICE')
@@ -244,9 +243,7 @@ class _Profile:
             if isinstance(service,bytes):
                 service = service.decode()
         else: 
-            # Check wfs3 service
-            if endpoint and endpoint.startswith('/wfs3'):
-                service = 'WFS'
+            service = default
 
         return service
 
@@ -310,32 +307,36 @@ class _Profile:
         if not any( test.match(m) for m in maps ):
             raise ProfileError("Rejected MAP: %s" % test)
 
-    def test_urls( self, request: HTTPRequest, service: str, endpoint: str ) -> None:
+    def test_urls( self, request: HTTPRequest, service: str) -> None:
         """ Override 'X-Forwarded-Url' header
         """
         # Retrieve url associated to the service
         # and override the 'X-Forwarded-Url' header
         url = self._urls.get(service)
         if url:
-            request.headers['X-Forwarded-Url'] = f"{url['url'].strip('/')}{endpoint}"
+            request.headers['X-Forwarded-Url'] = url['url']
             # Supported in Qgis 3.20+, replace the complete url (query params included...)
             # As 3.20.3 does not work with WFS3
             if url['serviceURL']:
                 request.headers['X-Qgis-Service-Url'] = url['url']
         # Do not change url for default profile
         elif self._name != 'default':
-            request.headers['X-Forwarded-Url'] = f"{request.protocol}://{request.host}/ows/p/{self._name}{endpoint}"
+            url = f"{request.protocol}://{request.host}/ows/p/{self._name}/"
+            # Assume 'serviceURL'
+            request.headers['X-Qgis-Service-Url'] = url
+            request.headers['X-Forwarded-Url'] = url
 
-    def apply(self, request: HTTPRequest, endpoint: str, http_proxy: bool, with_referer: bool=False) -> Optional[Dict]:
+    def apply(self, request: HTTPRequest, http_proxy: bool, with_referer: bool=False, 
+              service: Optional[str]=None) -> Optional[Dict]:
         """ Apply profiles constraints
         """
         request.arguments.update((k,[v.encode()]) for k,v in  self._parameters.items())
        
         self._arguments = {k.upper(): v for k, v in request.arguments.items()} 
 
-        service = self.get_service(endpoint)
+        service = self.get_service(default=service)
         self.test_services(request, service)
-        self.test_urls(request, service, endpoint)
+        self.test_urls(request, service)
         if with_referer:
             self.test_allowed_referers_or_ips(request, http_proxy)
         else:
@@ -410,7 +411,8 @@ class ProfileMngr:
             LOGGER.info("Disabling profiles autoreload")
             self._autoreload.stop()            
 
-    def apply_profile( self, name: str, endpoint: str, request: HTTPRequest, 
+    def apply_profile( self, name: str, request: HTTPRequest,
+                       service: Optional[str]=None,
                        wps_policies: Optional[List]=None) -> bool:
         """ Check profile condition
         """
@@ -425,9 +427,10 @@ class ProfileMngr:
             if self._accesspolicy: 
                 wps_policies.append(_kwargs(self._accesspolicy, 'deny', 'allow'))
             # Apply filter
-            output_debug_profile(name, profile, endpoint)
-            wps_policy = profile.apply(request, endpoint, self._http_proxy, 
-                                       with_referer=self._with_referer)
+            output_debug_profile(name, profile)
+            wps_policy = profile.apply(request, self._http_proxy, 
+                                       with_referer=self._with_referer,
+                                       service=service)
             if wps_policy:
                 wps_policies.append(wps_policy)
 
@@ -474,14 +477,23 @@ def register_policy(policy_service, *args, **kwargs) -> None:
     @policy_filter()
     def default_filter(request: HTTPRequest) -> None:
         if not mngr.apply_profile('default', "/", request):
-            raise HTTPError(403,reason="Unauthorized profile")
+            raise HTTPError(403, reason="Unauthorized profile")
 
-    @policy_filter(match=r"/ows/p/(?P<profile>(?:(?!/wfs3/?).)*)(?P<endpoint>/.*)?", repl=r"/ows\2")
-    def profile_filter(request: HTTPRequest, profile: str, endpoint: Optional[str]=None ) -> List[Dict]:
-        if not mngr.apply_profile(profile, endpoint or "/", request):
-            raise HTTPError(403,reason="Unauthorized profile")
+    @policy_filter(match=r"/ows/p/(?P<profile>(?:(?!/wfs3/?).)*)/wfs3(.*)", repl=r"/wfs3\2")
+    def profile_filter_wfs3(request: HTTPRequest, profile: str ) -> List[Dict]:
+        if not mngr.apply_profile(profile, request, service='WFS'):
+            raise HTTPError(403, reason="Unauthorized profile")
 
-    policy_service.add_filters([profile_filter, default_filter], pri=1000)
+    @policy_filter(match=r"/ows/p/(?P<profile>(?:(?!/wfs3/?).)*)(.*)", repl=r"/ows\2")
+    def profile_filter_ows(request: HTTPRequest, profile: str ) -> List[Dict]:
+        if not mngr.apply_profile(profile, request):
+            raise HTTPError(403, reason="Unauthorized profile")
+
+    policy_service.add_filters([
+        profile_filter_wfs3, 
+        profile_filter_ows,
+        default_filter,
+    ], pri=1000)
 
 
 def register_wps_policy(policy_service, *args, **kwargs) -> None:
@@ -507,17 +519,17 @@ def register_wps_policy(policy_service, *args, **kwargs) -> None:
         return []
 
     @policy_filter(match=r"/ows/p/(?P<profile>.*)", repl=r"/ows/")
-    def profile_filter(request: HTTPRequest, profile: str) -> List[Dict]:
+    def profile_filter_ows(request: HTTPRequest, profile: str) -> List[Dict]:
         wps_policies = []
         if not mngr.apply_profile(profile, "/", request, wps_policies=wps_policies):
-            raise HTTPError(403,reason="Unauthorized profile")
+            raise HTTPError(403, reason="Unauthorized profile")
         return wps_policies 
 
     policy_service.add_filters([
-        profile_filter, 
+        profile_filter_ows, 
         store_filter_1,
         store_filter_2,
-        default_filter
+        default_filter,
     ], pri=1000)
 
 

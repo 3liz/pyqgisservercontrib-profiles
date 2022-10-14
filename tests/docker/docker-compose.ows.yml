@@ -27,7 +27,7 @@ services:
             PYTEST_ADDOPTS: ${PYTEST_ADDOPTS}
         user: ${BECOME_USER}
         volumes:
-            - ${SERVER_SRC}:/server_src
+            - ${OWS_SERVER_SRC}:/server_src
             - ${SRCDIR}:/src
             - ${PWD}/.local:/.local
             - ${PWD}/.cache:/.cache

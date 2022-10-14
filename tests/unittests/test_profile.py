@@ -205,7 +205,7 @@ class Tests(HTTPTestCase):
         elem = rv.xml.findall(".//wms:OnlineResource", ns)
         assert len(elem) > 0
 
-        urlref = urlparse('https://wms.url/path/')
+        urlref = urlparse('https://wms.url/path/ows')
 
         href = urlparse(elem[0].get(xlink+'href'))
         assert href.scheme   == urlref.scheme
