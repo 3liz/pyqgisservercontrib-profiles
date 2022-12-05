@@ -249,3 +249,26 @@ class Tests(HTTPTestCase):
         assert href.scheme   == urlref.scheme
         assert href.hostname == urlref.hostname
         assert href.path.startswith(urlref.path)
+
+
+    def test_wms_proxy_header(self):
+        """ Test proxy urls definitions
+        """
+        uri = ('/ows/p/proxy_headers/?service=WMS&request=GetCapabilities')
+        
+        rv = self.client.get(uri,path='')
+        assert rv.status_code == 200
+        assert rv.headers['Content-Type'] == 'text/xml; charset=utf-8'
+        elem = rv.xml.findall(".//wms:OnlineResource", ns)
+        assert len(elem) > 0
+
+        urlref = urlparse('https://wms.url/path/')
+
+        href = urlparse(elem[0].get(xlink+'href'))
+
+        assert href.scheme   == urlref.scheme
+        assert href.hostname == urlref.hostname
+        assert href.path     == urlref.path
+        assert href.query    == ""
+
+

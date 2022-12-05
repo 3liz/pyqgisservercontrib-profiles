@@ -20,3 +20,11 @@ proxy_no_service_urls:
       url: 'https://wms.url/path/'
       serviceURL: no
 
+proxy_headers:
+  services: 
+    - WMS
+  parameters:
+    MAP: france_parts.qgs
+  headers:
+    "X-Qgis-Service-Url": 'https://wms.url/path/'
+

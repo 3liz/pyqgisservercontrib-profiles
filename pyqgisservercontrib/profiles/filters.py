@@ -19,6 +19,10 @@ profiles:
         allowed_ips:
             - 192.168.0.3/16
             - ...
+        # Override headers
+        headers:
+            'X-My-headers': 'value'
+            
 
     # Other profiles follows
 """
@@ -104,6 +108,11 @@ URL_SCHEMA = dict(
 )
 
 
+HEADERS_SCHEMA = dict(        
+    type = 'object',
+    properties={ 'additionalProperties': { 'type': 'string' }}
+)
+
 PROFILE_SCHEMA = dict(
     type = 'object',
     properties = dict(
@@ -113,6 +122,7 @@ PROFILE_SCHEMA = dict(
         allowed_ips = IPS_SCHEMA,
         accesspolicy = POLICY_SCHEMA,
         urls = URL_SCHEMA,
+        headers = HEADERS_SCHEMA,
     )
 )
 
@@ -218,6 +228,7 @@ class _Profile:
         self._parameters  = data.get('parameters',{})
         self._allowed_ips = [ip_network(ip) for ip in data.get('allowed_ips',[])]
         self._accesspolicy = data.get('accesspolicy') if wpspolicy else None
+        self._headers = data.get('headers')
 
         self._arguments = {}
 
@@ -307,7 +318,7 @@ class _Profile:
         if not any( test.match(m) for m in maps ):
             raise ProfileError("Rejected MAP: %s" % test)
 
-    def test_urls( self, request: HTTPRequest, service: str) -> None:
+    def test_urls(self, request: HTTPRequest, service: str) -> None:
         """ Override 'X-Forwarded-Url' header
         """
         # Retrieve url associated to the service
@@ -326,6 +337,12 @@ class _Profile:
             request.headers['X-Qgis-Service-Url'] = url
             request.headers['X-Forwarded-Url'] = url
 
+    def test_headers(self, request: HTTPRequest):
+        """ Apply headers
+        """
+        for (k,v) in self._headers.items():
+            request.headers[k] = v
+
     def apply(self, request: HTTPRequest, http_proxy: bool, with_referer: bool=False, 
               service: Optional[str]=None) -> Optional[Dict]:
         """ Apply profiles constraints
@@ -342,6 +359,7 @@ class _Profile:
         else:
             self.test_allowed_ips(request, http_proxy)
         self.test_only()
+        self.test_headers(request)
         if self._accesspolicy:
             return _kwargs(self._accesspolicy,'deny','allow')
 
