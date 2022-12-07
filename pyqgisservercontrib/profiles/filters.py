@@ -228,7 +228,7 @@ class _Profile:
         self._parameters  = data.get('parameters',{})
         self._allowed_ips = [ip_network(ip) for ip in data.get('allowed_ips',[])]
         self._accesspolicy = data.get('accesspolicy') if wpspolicy else None
-        self._headers = data.get('headers')
+        self._headers = data.get('headers', {})
 
         self._arguments = {}
 
