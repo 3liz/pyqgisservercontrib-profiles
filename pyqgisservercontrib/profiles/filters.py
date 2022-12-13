@@ -502,14 +502,20 @@ def register_policy(policy_service, *args, **kwargs) -> None:
         if not mngr.apply_profile(profile, request, service='WFS'):
             raise HTTPError(403, reason="Unauthorized profile")
 
-    @policy_filter(match=r"/ows/p/(?P<profile>(?:(?!/wfs3/?).)*)(.*)", repl=r"/ows\2")
+    @policy_filter(match=r"/ows/p/(?P<profile>(?:(?!/ows/?).)*)/ows(.*)", repl=r"/ows\2")
     def profile_filter_ows(request: HTTPRequest, profile: str ) -> List[Dict]:
+        if not mngr.apply_profile(profile, request):
+            raise HTTPError(403, reason="Unauthorized profile")
+
+    @policy_filter(match=r"/ows/p/(?P<profile>(?:(?!/wfs3/?).)*)(.*)", repl=r"/ows\2")
+    def profile_filter_ows_2(request: HTTPRequest, profile: str ) -> List[Dict]:
         if not mngr.apply_profile(profile, request):
             raise HTTPError(403, reason="Unauthorized profile")
 
     policy_service.add_filters([
         profile_filter_wfs3, 
         profile_filter_ows,
+        profile_filter_ows_2,
         default_filter,
     ], pri=1000)
 
