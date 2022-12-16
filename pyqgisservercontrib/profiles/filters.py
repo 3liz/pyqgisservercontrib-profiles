@@ -538,8 +538,12 @@ def register_wps_policy(policy_service, *args, **kwargs) -> None:
     def store_filter(request: HTTPRequest, *args, **kwargs) -> List[Dict]:
         return []
 
-    @policy_filter(match=r"/ows/p/(?P<profile>.*)/jobs/([^/]+)/files/(.+)", repl=r"/jobs/\2/files/\3")
+    @policy_filter(match=r"/ows/p/(?P<profile>.*)/jobs(.*)", repl=r"/jobs\2")
     def jobs_filter(request: HTTPRequest, *arg, **kwargs) -> List[Dict]:
+        return []
+
+    @policy_filter(match=r"/ows/p/(?P<profile>.*)/processes(.*)", repl=r"/processes\2")
+    def processes_filter(request: HTTPRequest, *arg, **kwargs) -> List[Dict]:
         return []
 
     @policy_filter(match=r"/ows/p/(?P<profile>.*)", repl=r"/ows/")
@@ -552,6 +556,7 @@ def register_wps_policy(policy_service, *args, **kwargs) -> None:
     policy_service.add_filters([
         store_filter,
         jobs_filter,
+        processes_filter,
         profile_filter_ows, 
         default_filter,
     ], pri=1000)
