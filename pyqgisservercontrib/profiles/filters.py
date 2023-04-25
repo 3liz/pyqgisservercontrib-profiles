@@ -22,7 +22,7 @@ profiles:
         # Override headers
         headers:
             'X-My-headers': 'value'
-            
+
 
     # Other profiles follows
 """
@@ -41,7 +41,7 @@ from yaml.nodes import SequenceNode
 from typing import Mapping, TypeVar, Any, Optional, Dict, List
 
 from ipaddress import ip_address, ip_network
-from glob import glob 
+from glob import glob
 from pathlib import Path
 
 from pyqgisservercontrib.core.watchfiles import watchfiles
@@ -108,7 +108,7 @@ URL_SCHEMA = dict(
 )
 
 
-HEADERS_SCHEMA = dict(        
+HEADERS_SCHEMA = dict(
     type = 'object',
     properties={ 'additionalProperties': { 'type': 'string' }}
 )
@@ -136,7 +136,7 @@ SCHEMA= dict(
         profiles = { 'type': 'object', "properties": {
             'additionalProperties': PROFILE_SCHEMA
         }}
-    )  
+    )
 )
 
 
@@ -157,7 +157,7 @@ def _to_list( arg ):
 
 class Loader(yaml.SafeLoader):
     """ See https://pyyaml.org/wiki/PyYAMLDocumentation
-    """  
+    """
 
     def __init__(self, stream):
         self._root = os.path.split(stream.name)[0]
@@ -221,7 +221,7 @@ def _match_fun(e):
 
 
 class _Profile:
-    
+
     def __init__(self, name: str, data: Mapping[str,Any], wpspolicy: bool=False) -> None:
         self._name        = name
         self._services    = data.get('services')
@@ -235,7 +235,7 @@ class _Profile:
         # Urls have two different forms, use one
         def _url2dict( item ):
             if isinstance(item, str):
-                item={ 'url': item, 'serviceURL': True } 
+                item={ 'url': item, 'serviceURL': True }
             return item
 
         self._urls = { k: _url2dict(v) for k,v in data.get('urls',{}).items() }
@@ -253,7 +253,7 @@ class _Profile:
             service = service[-1]
             if isinstance(service,bytes):
                 service = service.decode()
-        else: 
+        else:
             service = default
 
         return service
@@ -295,7 +295,7 @@ class _Profile:
                 raise ProfileError("Missing or empty 'X-Forwarded-For' header")
         else:
             ip = request.remote_ip
-        
+
         ip = ip_address(ip)
         if not any( (ip in _ips) for _ips in self._allowed_ips ):
             raise ProfileError("Rejected ip %s" % ip)
@@ -343,13 +343,13 @@ class _Profile:
         for (k,v) in self._headers.items():
             request.headers[k] = v
 
-    def apply(self, request: HTTPRequest, http_proxy: bool, with_referer: bool=False, 
+    def apply(self, request: HTTPRequest, http_proxy: bool, with_referer: bool=False,
               service: Optional[str]=None) -> Optional[Dict]:
         """ Apply profiles constraints
         """
         request.arguments.update((k,[v.encode()]) for k,v in  self._parameters.items())
-       
-        self._arguments = {k.upper(): v for k, v in request.arguments.items()} 
+
+        self._arguments = {k.upper(): v for k, v in request.arguments.items()}
 
         service = self.get_service(default=service)
         self.test_services(request, service)
@@ -365,7 +365,7 @@ class _Profile:
 
 
 class ProfileMngr:
-    
+
     @classmethod
     def initialize( cls, profiles: str, exit_on_error: bool=True, wpspolicy: bool=False,
                     with_referer: bool=False,
@@ -419,15 +419,15 @@ class ProfileMngr:
         if config.get('autoreload', False):
             if self._autoreload is None:
                 check_time = config.get('autoreload_check_time', 3000)
-                self._autoreload = watchfiles([profiles], 
-                                              lambda modified_files: self.load(profiles), 
+                self._autoreload = watchfiles([profiles],
+                                              lambda modified_files: self.load(profiles),
                                               check_time=check_time)
             if not self._autoreload.is_running():
                 LOGGER.info("Enabling profiles autoreload")
                 self._autoreload.start()
         elif self._autoreload is not None and self._autoreload.is_running():
             LOGGER.info("Disabling profiles autoreload")
-            self._autoreload.stop()            
+            self._autoreload.stop()
 
     def apply_profile( self, name: str, request: HTTPRequest,
                        service: Optional[str]=None,
@@ -436,17 +436,17 @@ class ProfileMngr:
         """
         try:
             # name may be a path like string
-            if name: 
+            if name:
                 name = name.strip('/')
             profile = self._profiles.get(name or 'default')
             if profile is None:
                 raise ProfileError("Unknown profile")
             # Apply global access policy
-            if self._accesspolicy: 
+            if self._accesspolicy:
                 wps_policies.append(_kwargs(self._accesspolicy, 'deny', 'allow'))
             # Apply filter
             output_debug_profile(name, profile)
-            wps_policy = profile.apply(request, self._http_proxy, 
+            wps_policy = profile.apply(request, self._http_proxy,
                                        with_referer=self._with_referer,
                                        service=service)
             if wps_policy:
@@ -455,14 +455,14 @@ class ProfileMngr:
             return True
         except ProfileError as err:
             LOGGER.error("Invalid profile '%s': %s", name or "<default>", err)
-                
+
         return False
 
 
 def initialize_profiles(wpspolicy: bool) -> ProfileMngr:
     from  pyqgisservercontrib.core import componentmanager
     configservice  = componentmanager.get_service('@3liz.org/config-service;1')
-  
+
     configservice.add_section('contrib:profiles')
 
     with_profiles = \
@@ -475,13 +475,13 @@ def initialize_profiles(wpspolicy: bool) -> ProfileMngr:
         with_referer = configservice.getboolean('contrib:profiles','with_referer',fallback=False)
         with_referer = configservice.getboolean('contrib:profiles','with_referer',fallback=False)
 
-        mngr = ProfileMngr.initialize(with_profiles, 
-                                      wpspolicy=wpspolicy, 
+        mngr = ProfileMngr.initialize(with_profiles,
+                                      wpspolicy=wpspolicy,
                                       with_referer=with_referer,
                                       http_proxy=http_proxy)
 
         return mngr
-                
+
     return None
 
 
@@ -491,7 +491,7 @@ def register_policy(policy_service, *args, **kwargs) -> None:
     mngr = initialize_profiles(wpspolicy=False)
     if not mngr:
         return
-    
+
     @policy_filter()
     def default_filter(request: HTTPRequest) -> None:
         if not mngr.apply_profile('default', "/", request):
@@ -513,7 +513,7 @@ def register_policy(policy_service, *args, **kwargs) -> None:
             raise HTTPError(403, reason="Unauthorized profile")
 
     policy_service.add_filters([
-        profile_filter_wfs3, 
+        profile_filter_wfs3,
         profile_filter_ows,
         profile_filter_ows_2,
         default_filter,
@@ -526,13 +526,13 @@ def register_wps_policy(policy_service, *args, **kwargs) -> None:
     mngr = initialize_profiles(wpspolicy=True)
     if not mngr:
         return
- 
+
     @policy_filter()
     def default_filter(request: HTTPRequest) -> List[Dict]:
         wps_policies = []
         if not mngr.apply_profile('default', "/", request, wps_policies=wps_policies):
             raise HTTPError(403,reason="Unauthorized profile")
-        return wps_policies 
+        return wps_policies
 
     @policy_filter(match=r"/store/([^/]+)/(.+)", repl=r"/jobs/\1/files/\2")
     def store_filter(request: HTTPRequest, *args, **kwargs) -> List[Dict]:
@@ -551,15 +551,12 @@ def register_wps_policy(policy_service, *args, **kwargs) -> None:
         wps_policies = []
         if not mngr.apply_profile(profile, request, wps_policies=wps_policies):
             raise HTTPError(403, reason="Unauthorized profile")
-        return wps_policies 
+        return wps_policies
 
     policy_service.add_filters([
         store_filter,
         jobs_filter,
         processes_filter,
-        profile_filter_ows, 
+        profile_filter_ows,
         default_filter,
     ], pri=1000)
-
-
-
