@@ -494,7 +494,7 @@ def register_policy(policy_service, *args, **kwargs) -> None:
 
     @policy_filter()
     def default_filter(request: HTTPRequest) -> None:
-        if not mngr.apply_profile('default', "/", request):
+        if not mngr.apply_profile('default', request):
             raise HTTPError(403, reason="Unauthorized profile")
 
     @policy_filter(match=r"/ows/p/(?P<profile>(?:(?!/wfs3/?).)*)/wfs3(.*)", repl=r"/wfs3\2")
@@ -530,7 +530,7 @@ def register_wps_policy(policy_service, *args, **kwargs) -> None:
     @policy_filter()
     def default_filter(request: HTTPRequest) -> List[Dict]:
         wps_policies = []
-        if not mngr.apply_profile('default', "/", request, wps_policies=wps_policies):
+        if not mngr.apply_profile('default', request, wps_policies=wps_policies):
             raise HTTPError(403,reason="Unauthorized profile")
         return wps_policies
 
