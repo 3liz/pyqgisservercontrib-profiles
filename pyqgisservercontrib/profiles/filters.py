@@ -224,7 +224,8 @@ class _Profile:
 
     def __init__(self, name: str, data: Mapping[str,Any], wpspolicy: bool=False) -> None:
         self._name        = name
-        self._services    = data.get('services')
+        # make service case insensitive
+        self._services    = [service.upper() for service in data.get('services', [])]
         self._parameters  = data.get('parameters',{})
         self._allowed_ips = [ip_network(ip) for ip in data.get('allowed_ips',[])]
         self._accesspolicy = data.get('accesspolicy') if wpspolicy else None
@@ -256,7 +257,7 @@ class _Profile:
         else:
             service = default
 
-        return service
+        return service.upper()
 
     def test_services(self, request: HTTPRequest, service: str) -> None:
         """ Test allowed services
