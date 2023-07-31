@@ -246,7 +246,7 @@ class _Profile:
         # 'only' directive
         self._mapfilters  = _to_list(data.get('only',{}).get('map',[]))
 
-    def get_service(self, default: Optional[str]=None) -> str:
+    def get_service(self, default: Optional[str]=None) -> Optional[str]:
         """ Return  request service
         """
         service = self._arguments.get('SERVICE')
@@ -257,7 +257,7 @@ class _Profile:
         else:
             service = default
 
-        return service.upper()
+        return None if service is None else service.upper()
 
     def test_services(self, request: HTTPRequest, service: str) -> None:
         """ Test allowed services
