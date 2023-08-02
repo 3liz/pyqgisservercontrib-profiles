@@ -341,6 +341,13 @@ class _Profile:
     def test_headers(self, request: HTTPRequest):
         """ Apply headers
         """
+        maps = self._arguments.get('MAP')
+        if maps:
+            map_ = maps[-1]
+            if isinstance(map_, bytes):
+                map_ = map_.decode()
+            request.headers['X-Qgis-Project'] = map_
+
         for (k,v) in self._headers.items():
             request.headers[k] = v
 
