@@ -338,7 +338,7 @@ class _Profile:
             request.headers['X-Qgis-Service-Url'] = url
             request.headers['X-Forwarded-Url'] = url
 
-    def test_headers(self, request: HTTPRequest):
+    def test_headers(self, request: HTTPRequest, service: str):
         """ Apply headers
         """
         maps = self._arguments.get('MAP')
@@ -347,6 +347,9 @@ class _Profile:
             if isinstance(map_, bytes):
                 map_ = map_.decode()
             request.headers['X-Qgis-Project'] = map_
+            # This prevents generating urls which contain the qgis project name in wfs3
+            if service == 'WFS':
+                request.arguments.pop('MAP')
 
         for (k,v) in self._headers.items():
             request.headers[k] = v
@@ -367,7 +370,7 @@ class _Profile:
         else:
             self.test_allowed_ips(request, http_proxy)
         self.test_only()
-        self.test_headers(request)
+        self.test_headers(request, service)
         if self._accesspolicy:
             return _kwargs(self._accesspolicy,'deny','allow')
 
